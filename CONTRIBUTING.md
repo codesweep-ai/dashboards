@@ -48,12 +48,14 @@ make deps status preview
 `make deps` installs the design system, `status` fetches each project's status
 file into the tree, and `preview` copies the pages in and serves them.
 
-Then open `http://localhost:8732/dashboards/`. Two differences from production,
-both harmless: `python3 -m http.server` does not serve extensionless URLs, so
-follow `ci.html` rather than `ci`, and it sends no cache headers.
+Then open `http://localhost:8732/dashboards/ci.html`. Three things differ from
+production. `python3 -m http.server` does not serve extensionless URLs, so
+follow `ci.html` rather than `ci`. It runs no Jekyll, so the README is not
+rendered as the index and `/dashboards/` is a file listing. It also sends no
+cache headers.
 
-`?theme=light|dark|system` overrides the theme for one load without saving it,
-which is also how to screenshot a specific theme.
+`?theme=light|dark|system` overrides the theme for one load without saving
+it.
 
 Check the degraded paths too, because production will hit them first. Point an
 entry in `projects.json` at a file that does not exist, and back-date a
@@ -97,12 +99,12 @@ it survives greyscale and colour blindness.
 
 A new page is a flat `.html` file at the root, plus its `.js`, sharing
 `dashboard.css` and `tokens.css`. GitHub Pages serves `foo.html` at `/foo` as
-well. Link without the extension in prose, and with it in the index, which also
-has to work under the local preview server.
+well, so link without the extension in prose.
 
-Add it to the index in `index.html` and to the table in `README.md`. A page that
-is not built yet belongs in the index as a placeholder that is visibly not a
-link, rather than as a link that goes nowhere.
+The site's landing page is `README.md`, which Jekyll renders as the index, so a
+new page is announced by linking it from the README. Do not add an `index.html`:
+the plugin that renders the README defers to one, and the README would stop
+being the landing page.
 
 ## Commits
 
