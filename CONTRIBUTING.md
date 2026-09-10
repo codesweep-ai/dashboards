@@ -31,8 +31,9 @@ Run the gate:
 make check
 ```
 
-That is every gate CI runs except `actionlint`, which `make ci` adds. Neither
-can look at a page, so preview it as well.
+That is the faster subset. `make ci` adds the two gates with something to
+install, `actionlint` and the ledger check, and is what has to pass. Neither gate looks at a page, so preview
+the result as well.
 
 ## Previewing
 

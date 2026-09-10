@@ -148,13 +148,17 @@ repin:
 	go mod tidy
 
 ## check: the gate a contributor runs before pushing
-check: data test prose refs oss ledger
+check: data test prose refs oss
 
 ## ci: every gate the CI workflow runs, on this machine
 ##
 ## The jobs of .github/workflows/ci.yml, in the order CI runs them, so a red
 ## build is something you can see before you push rather than after.
-ci: check actionlint
+##
+## check is the faster subset to keep beside you while you work. The two gates
+## it does not carry are the ones with something to install: actionlint, and the
+## ledger check. The sibling projects draw the line in the same place.
+ci: check actionlint ledger
 	@printf '\nci: every gate ran. Not reproduced here: looking at the pages.\n'
 
 ## clean: remove the local preview tree and the copied tokens
