@@ -15,6 +15,11 @@
   },
   "resolution": null,
   "details": "How far behind each project's dependencies are. No repository in the org carries a dependabot.yml, so this page would be the only signal. The history shows the bumps are done by hand. Unlike the CI page, this one reports a state rather than an event. Nothing publishes it on a build, so it needs a schedule of its own. index.html already lists it as a placeholder.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-10",
+      "text": "index.html is deleted and the README is now the site's landing page, as in the sibling projects. There is no placeholder list any more, so this page announces itself by being linked from the README once it is built."
+    }
+  ],
   "links": []
 }

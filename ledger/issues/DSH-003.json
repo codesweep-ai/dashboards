@@ -15,6 +15,11 @@
   },
   "resolution": null,
   "details": "What cs-lint reports about each repository's documents and metadata, across the org. The data is what `cs-lint oss` already produces per repository. The work is publishing it the way the CI status is published, rather than computing anything new. index.html already lists it as a placeholder.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-10",
+      "text": "index.html is deleted and the README is now the site's landing page, as in the sibling projects. There is no placeholder list any more, so this page announces itself by being linked from the README once it is built."
+    }
+  ],
   "links": []
 }
