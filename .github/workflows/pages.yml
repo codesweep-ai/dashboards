@@ -45,10 +45,9 @@ jobs:
       - uses: actions/configure-pages@v5
 
       # The same Jekyll the sibling projects' branch-served sites are built with,
-      # so the documents render the same way here. index.html is left alone:
-      # the plugin that turns README.md into a site's index defers to an
-      # index.html that already exists, which is why the dashboard is the
-      # landing page and the README is not.
+      # so the documents render the same way here. That includes the plugin that
+      # turns README.md into the site's index, which is how this repository's
+      # landing page comes to be its README, as in every sibling project.
       - uses: actions/jekyll-build-pages@v1
         with:
           source: ./
@@ -58,6 +57,8 @@ jobs:
       # one would show up only as a blank dashboard.
       - name: check the pages were published
         run: |
+          # index.html is not in the tree: Jekyll renders it from README.md, so
+          # checking for it here is what catches that step silently not running.
           for f in index.html ci.html ci.js dashboard.css tokens.css projects.json; do
             test -s "_site/$f" || { echo "missing from the built site: $f" >&2; exit 1; }
           done

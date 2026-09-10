@@ -450,37 +450,3 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
 }
 .ci-page__crumb a { color: var(--color-link); text-decoration: none; }
 .ci-page__crumb a:hover { text-decoration: underline; }
-
-.ci-index { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-.ci-index a {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  display: block;
-  padding: var(--space-4);
-  text-decoration: none;
-}
-.ci-index a:hover { border-color: var(--color-accent); }
-.ci-index h2 { font-size: var(--font-size-section-title); font-weight: var(--font-weight-semibold); }
-.ci-index p { color: var(--muted); font-size: var(--font-size-caption); margin-top: var(--space-1); }
-/* Not links: a placeholder that looks clickable is worse than one that does not. */
-.ci-index__soon {
-  background: var(--color-bg-muted);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  display: block;
-  padding: var(--space-4);
-}
-.ci-index__soon h2 {
-  color: var(--muted);
-  font-size: var(--font-size-section-title);
-  font-weight: var(--font-weight-semibold);
-}
-.ci-index__soon h2::after {
-  color: var(--muted);
-  content: " · not built yet";
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-regular);
-}
-.ci-index__soon p { color: var(--muted); font-size: var(--font-size-caption); margin-top: var(--space-1); }

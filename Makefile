@@ -13,8 +13,10 @@ CS_LINT ?= go tool cs-lint
 PYTHON  ?= python3
 NPM     ?= npm
 
-# The pages and the data the preview tree is assembled from.
-SITE     := index.html ci.html ci.js dashboard.css tokens.css projects.json
+# The pages and the data the preview tree is assembled from. README.md is not
+# here: Jekyll renders it as the site's index in production, and the preview
+# server runs no Jekyll, so there is nothing to copy.
+SITE     := ci.html ci.js dashboard.css tokens.css projects.json
 PREVIEW  ?= _preview
 PORT     ?= 8732
 STATUS_TMP := $(shell mktemp -u -t ci-status.XXXXXX.json)
@@ -83,7 +85,7 @@ preview: build
 	else \
 	  echo "preview: $$n of $(words $(PROJECTS)) projects have a status file"; \
 	fi
-	@echo "preview: http://localhost:$(PORT)/dashboards/ (ctrl-c to stop)"
+	@echo "preview: http://localhost:$(PORT)/dashboards/ci.html (ctrl-c to stop)"
 	@cd $(PREVIEW) && $(PYTHON) -m http.server $(PORT)
 
 ## data: check projects.json is well formed and same-origin
