@@ -1,0 +1,6 @@
+# The dashboard's data files and recorded fixtures are compared byte for byte. A
+# checkout on Windows applies core.autocrlf and rewrites every text file to CRLF,
+# which changes bytes the tools never wrote.
+#
+# text=auto still lets git detect and leave binaries alone.
+* text=auto eol=lf

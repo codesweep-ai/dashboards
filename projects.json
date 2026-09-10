@@ -1,0 +1,14 @@
+{
+ "schema": 1,
+ "title": "codesweep-ai CI",
+ "comment": "Each project publishes its own ci-status.json to its Pages site. These URLs are relative to this file, and every one of them is same-origin under codesweep.ai — no CORS, no API rate limit, no token. Adding a project here is the only change the dashboard needs.",
+ "projects": [
+  { "name": "campaign", "status": "../campaign/ci-status.json" },
+  { "name": "ledger",   "status": "../ledger/ci-status.json" },
+  { "name": "lint",     "status": "../lint/ci-status.json" },
+  { "name": "sandbox",  "status": "../sandbox/ci-status.json" },
+  { "name": "tracer",   "status": "../tracer/ci-status.json" },
+  { "name": "ui",       "status": "../ui/ci-status.json" },
+  { "name": "vcr",      "status": "../vcr/ci-status.json" }
+ ]
+}

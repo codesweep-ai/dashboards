@@ -1,0 +1,7 @@
+{
+  "project": "dashboards",
+  "idPrefix": "DSH",
+  "schemaVersion": "issue.v1",
+  "staleAfterDays": 14,
+  "toolVersion": "0.7.0"
+}

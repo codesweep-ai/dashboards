@@ -1,0 +1,20 @@
+{
+  "id": "DSH-003",
+  "title": "The open-source readiness page is not built",
+  "type": "feature-idea",
+  "severity": "med",
+  "status": "open",
+  "foundBy": "session agent, while building this repository",
+  "opened": "2026-09-10",
+  "resolved": null,
+  "stint": null,
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "What cs-lint reports about each repository's documents and metadata, across the org. The data is what `cs-lint oss` already produces per repository. The work is publishing it the way the CI status is published, rather than computing anything new. index.html already lists it as a placeholder.",
+  "notes": [],
+  "links": []
+}

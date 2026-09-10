@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Write ci-status.json: one repository's own CI health, for the dashboard to read.
+
+Runs inside that repository's Actions job, so it reads only its own runs and the
+job's built-in GITHUB_TOKEN is enough — nothing here reaches another repository.
+"""
+
+import json
+import os
+import statistics
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+
+SCHEMA = 1
+API = "https://api.github.com"
+
+# The Pages build GitHub generates for any Pages site is not CI, and not this
+# repository's to report. The runs API gives its display name and the workflows
+# API its slug, so skip both spellings.
+SKIP_WORKFLOWS = {"pages build and deployment", "pages-build-deployment"}
+
+# The run doing the writing is itself in flight, and reporting it would put a
+# workflow that never finishes on every card. Excluding the run rather than the
+# workflow keeps that workflow's finished history, which is real news: whatever
+# publishes the status can fail, and the failure should be visible.
+SKIP_RUN_ID = os.environ.get("GITHUB_RUN_ID")
+# Cancelled and skipped runs say nothing about the code, so they stay out of the
+# denominator rather than being scored as failures.
+PASSED = {"success"}
+FAILED = {"failure", "timed_out", "startup_failure"}
+
+
+def api(path, token):
+    req = urllib.request.Request(
+        f"{API}/{path}",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "ci-status",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def parse_ts(ts):
+    if not ts:
+        return None
+    return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def build(owner, name, token, window):
+    meta = api(f"repos/{owner}/{name}", token)
+    branch = meta.get("default_branch") or "main"
+
+    declared = {
+        w["name"]: w
+        for w in api(f"repos/{owner}/{name}/actions/workflows", token).get("workflows", [])
+        if w.get("state") == "active" and w["name"] not in SKIP_WORKFLOWS
+    }
+    runs = api(
+        f"repos/{owner}/{name}/actions/runs?branch={branch}&per_page=100", token
+    )["workflow_runs"]
+
+    seen = {}
+    for r in runs:
+        wf = r.get("name") or "(unnamed)"
+        if wf in SKIP_WORKFLOWS:
+            continue
+        if SKIP_RUN_ID and str(r.get("id")) == SKIP_RUN_ID:
+            continue
+        started, ended = parse_ts(r.get("run_started_at")), parse_ts(r.get("updated_at"))
+        seen.setdefault(wf, []).append({
+            "state": r.get("conclusion") or r.get("status") or "queued",
+            "started": r.get("run_started_at"),
+            "duration": int((ended - started).total_seconds()) if started and ended else None,
+            "title": r.get("display_title") or "",
+            "sha": (r.get("head_sha") or "")[:7],
+            "event": r.get("event") or "",
+            "attempt": r.get("run_attempt") or 1,
+            "actor": (r.get("actor") or {}).get("login") or "",
+            "url": r.get("html_url") or "",
+        })
+
+    workflows = []
+    for wf in sorted(set(declared) | set(seen)):
+        entries = sorted(seen.get(wf, []), key=lambda e: e["started"] or "", reverse=True)
+        recent = entries[:window]
+        verdicts = [e for e in recent if e["state"] in PASSED | FAILED]
+        passes = [e for e in verdicts if e["state"] in PASSED]
+        durations = [e["duration"] for e in verdicts if e["duration"] is not None]
+        streak = 0
+        for e in verdicts:
+            if e["state"] not in PASSED:
+                break
+            streak += 1
+        workflows.append({
+            "name": wf,
+            "path": (declared.get(wf) or {}).get("path", ""),
+            "declared": wf in declared,
+            "latest": entries[0] if entries else None,
+            "runs": recent,
+            "counted": len(verdicts),
+            "pass_rate": round(100 * len(passes) / len(verdicts)) if verdicts else None,
+            "failures": len(verdicts) - len(passes),
+            "median_duration": int(statistics.median(durations)) if durations else None,
+            "last_failure": next((e for e in entries if e["state"] in FAILED), None),
+            "green_streak": streak,
+        })
+
+    # The primary gate leads; the rest follow alphabetically.
+    workflows.sort(key=lambda w: (w["name"].lower() != "ci", w["name"].lower()))
+    return {
+        "schema": SCHEMA,
+        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "window": window,
+        "repo": {
+            "name": name,
+            "full_name": f"{owner}/{name}",
+            "description": meta.get("description") or "",
+            "url": meta.get("html_url") or "",
+            "branch": branch,
+            "pushed_at": meta.get("pushed_at"),
+        },
+        "workflows": workflows,
+    }
+
+
+def main():
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        sys.exit("ci-status: set GH_TOKEN or GITHUB_TOKEN")
+
+    slug = os.environ.get("GITHUB_REPOSITORY", "")
+    if len(sys.argv) > 1:
+        slug = sys.argv[1]
+    if "/" not in slug:
+        sys.exit("ci-status: pass owner/repo, or run where GITHUB_REPOSITORY is set")
+    owner, _, name = slug.partition("/")
+
+    window = int(os.environ.get("CI_STATUS_WINDOW", "20"))
+    out = os.environ.get("CI_STATUS_OUTPUT", "ci-status.json")
+
+    try:
+        data = build(owner, name, token, window)
+    except urllib.error.HTTPError as exc:
+        sys.exit(f"ci-status: {slug}: HTTP {exc.code} {exc.reason}")
+
+    text = json.dumps(data, indent=1, sort_keys=False) + "\n"
+    if out == "-":
+        sys.stdout.write(text)
+    else:
+        with open(out, "w") as fh:
+            fh.write(text)
+        print(out)
+
+
+if __name__ == "__main__":
+    main()

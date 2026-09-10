@@ -1,0 +1,21 @@
+# Deliberately not ignored, and committed on purpose: projects.json, which is
+# this repository's only configuration.
+
+# The local mirror of the codesweep.ai layout, rebuilt by hand when previewing.
+# It holds other projects' published status files, which are theirs to publish.
+/_preview/
+
+# A local .env is where a credential lands first, and ignoring it is what keeps
+# the next `git add -A` from publishing it.
+/.env
+/.env.*
+
+# Python's bytecode cache, left behind by running or compiling the action.
+__pycache__/
+
+# The design tokens, copied out of @codesweep-ai/ui by `npm run tokens`. The
+# package is the source; a copy in the history is a fork of it waiting to drift.
+/tokens.css
+
+# The installed dependency itself.
+/node_modules/

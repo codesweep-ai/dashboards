@@ -1,0 +1,20 @@
+{
+  "id": "DSH-004",
+  "title": "The releases page is not built",
+  "type": "feature-idea",
+  "severity": "low",
+  "status": "open",
+  "foundBy": "session agent, while building this repository",
+  "opened": "2026-09-10",
+  "resolved": null,
+  "stint": null,
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "Latest release per project, commits on main since it, and the published package version against the repository's. It would earn its place immediately. Six of the seven projects have no release at all, and release.yml has never run in any of them. index.html already lists it as a placeholder.",
+  "notes": [],
+  "links": []
+}

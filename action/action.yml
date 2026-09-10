@@ -1,0 +1,38 @@
+name: Publish CI status
+description: >
+  Write ci-status.json describing this repository's own CI health, for
+  codesweep.ai/ci-dashboard/ to read. Reads only this repository, so the job's
+  built-in GITHUB_TOKEN is enough — no personal access token is involved.
+
+inputs:
+  window:
+    description: How many runs per workflow to summarise.
+    required: false
+    default: "20"
+  output:
+    description: Where to write the file, relative to the workspace.
+    required: false
+    default: ci-status.json
+  token:
+    description: Token used to read this repository's runs. The default is the job's own.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  file:
+    description: The path written.
+    value: ${{ steps.generate.outputs.file }}
+
+runs:
+  using: composite
+  steps:
+    - id: generate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        CI_STATUS_WINDOW: ${{ inputs.window }}
+        CI_STATUS_OUTPUT: ${{ inputs.output }}
+      run: |
+        python3 "${{ github.action_path }}/ci-status"
+        echo "file=${{ inputs.output }}" >> "$GITHUB_OUTPUT"

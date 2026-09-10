@@ -1,0 +1,96 @@
+# There is no build here: the pages are plain files served as they are. So CI
+# checks the things that can be wrong without being visibly wrong — the data the
+# pages depend on, the action projects call, the documents, and the workflows.
+#
+# The document linters get a job each as well as running inside `make check`.
+# A job answers in a minute and answers even when another gate is failing;
+# `make check` is the one command a contributor runs before pushing.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: the gate a contributor runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # GH_TOKEN turns on the action's end-to-end run, which reads this
+      # repository's own workflow runs and nothing else.
+      - run: make check
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  prose:
+    name: docs prose
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make prose
+
+  refs:
+    name: docs refs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make refs
+
+  oss:
+    name: open-source readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit rules read history, so a shallow clone reports a repository
+          # whose past it cannot see.
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make oss
+
+  # The ledger's freshness gate. CONTRIBUTING.md asks for a render and a check
+  # before every commit that touches ledger/, and nothing else enforces it.
+  ledger:
+    name: ledger check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the check resolves every sha a record cites
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make ledger
+
+  actionlint:
+    name: workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make actionlint

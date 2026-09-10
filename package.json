@@ -1,0 +1,14 @@
+{
+  "name": "@codesweep-ai/dashboards",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Health dashboards for the codesweep-ai projects.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "tokens": "node scripts/copy-tokens.mjs"
+  },
+  "dependencies": {
+    "@codesweep-ai/ui": "^0.3.0"
+  }
+}

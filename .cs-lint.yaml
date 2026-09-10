@@ -1,0 +1,81 @@
+# The knobs cs-lint reads for this repository.
+#
+# The linters carry no project knowledge. Everything that differs between
+# repositories lives here, so a fix to a check reaches every project without
+# carrying one project's exceptions into the next.
+#
+# Run `cs-lint <linter> --explain` to read what each rule wants.
+
+docs:
+  # This project ships pages rather than a command, so there is no MANUAL.md:
+  # SPEC.md carries the only surface anyone integrates against, which is the
+  # status file's shape, and README.md carries the rest.
+  documents:
+    - README.md
+    - SPEC.md
+    - CONTRIBUTING.md
+    - AGENTS.md
+
+  prose:
+    # The domain terms a reader of this project cannot infer. Each must be
+    # introduced where a document first uses it: glossed on the spot, defined
+    # in a glossary table, or linked to the page that defines it.
+    #
+    # "dashboard" and "page" are deliberately absent — both read as ordinary
+    # English here, and the check would fire on every ordinary use.
+    glossary:
+      - status file
+      - design token
+      - same-origin
+
+    lowercaseStarters: []
+
+    projectVerbs: []
+
+    # The things this repository counts for itself. Prose that states one of
+    # these numbers is right the day it is written and wrong by the next
+    # project added, and nothing fails when it drifts.
+    countable:
+      - projects?
+      - pages?
+      - workflows?
+      - repositories?
+
+  refs: {}
+
+oss:
+  project: dashboards
+  githubRepo: codesweep-ai/dashboards
+
+  # True once the repository is public. Flip this in the same commit that
+  # makes it public.
+  published: true
+
+  # No INSTALL.md and no MANUAL.md: there is nothing to install, and nothing
+  # with a command surface. Adding a project is three steps in README.md, and
+  # the contract a project integrates against is SPEC.md.
+  docSet:
+    - README.md
+    - SPEC.md
+    - CONTRIBUTING.md
+    - AGENTS.md
+
+  # Only what the built-in list does not already carry. These four are this
+  # project's own vocabulary: the preview tree it assembles, the status files it
+  # fetches into it, the server it runs over it, and moving the linter pin.
+  expectedTargets: ["build", "status", "preview", "repin"]
+
+  # Every waiver takes the reason it is waived, and that reason is printed with
+  # the finding. A waiver nobody can review is a rule deleted in private.
+  allow:
+    OSS-407: >-
+      This repository publishes a website rather than artifacts. There is
+      nothing for a tagged release to build, and a releases page with nothing
+      on it is not the install path any reader takes: the install path is
+      opening codesweep.ai/dashboards/.
+    OSS-417: >-
+      There is no Go code here. go.mod exists only to pin cs-lint and
+      actionlint as `tool` directives, so a fresh checkout runs the gate with
+      nothing installed by hand. golangci-lint over zero Go files reports
+      nothing, and a .golangci.yml would say what the linters should do to
+      code this repository does not have.

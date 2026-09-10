@@ -1,0 +1,486 @@
+/* ============================================================
+   Dashboard — domain CSS in BEM, per @codesweep-ai/ui
+   DESIGN_SYSTEM_SPEC.md §7.8. Every value resolves through a token from
+   tokens.css; the only literals are the run strip's geometry, which encodes
+   data rather than style.
+   ============================================================ */
+
+/* --- base: the rules this page needs from the package's base.css --- */
+*,
+*::before,
+*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* tokens.css defines dark on :root, so an unresolved theme is a dark page. */
+:root { color-scheme: dark; }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: var(--space-6) var(--space-5);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-sm); }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+.text-label-upper {
+  color: var(--muted);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+[hidden] { display: none !important; }
+a { color: inherit; }
+code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
+
+:focus-visible {
+  outline: 0.125rem solid var(--color-accent);
+  outline-offset: 0.125rem;
+}
+
+/* --- status roles, mapped once onto the system's tokens. Colour never travels
+       alone here: every state also carries an icon and a word. --- */
+:root {
+  --ci-good: var(--color-success);
+  --ci-good-bg: var(--color-success-bg);
+  --ci-critical: var(--color-error);
+  --ci-critical-text: var(--color-error-text);
+  --ci-critical-bg: var(--color-error-bg);
+  --ci-warn: var(--color-warning);
+  --ci-warn-bg: var(--color-warning-bg);
+  --ci-idle: var(--color-neutral);
+  --ci-idle-bg: var(--color-neutral-bg);
+  /* No hero token exists; derive one from the stat ramp so it moves with it. */
+  --ci-font-size-hero: calc(var(--font-size-stat) * 2);
+}
+
+.ci-page { margin: 0 auto; max-width: 1180px; }
+
+.ci-page__top {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+.ci-page__top h1 {
+  font-size: var(--font-size-page-title);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+.ci-page__sub { color: var(--muted); font-size: var(--font-size-caption); }
+
+/* --- hero + stat tiles --- */
+.ci-hero {
+  align-items: flex-end;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin-bottom: var(--space-4);
+  padding: var(--space-5);
+}
+.ci-hero__figure {
+  color: var(--fg);
+  font-size: var(--ci-font-size-hero);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+.ci-hero__of {
+  color: var(--muted);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--space-1);
+}
+.ci-hero__note {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  margin-top: var(--space-1);
+}
+.ci-hero__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  margin-left: auto;
+}
+.ci-stat__value {
+  color: var(--fg);
+  font-size: var(--font-size-stat);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+.ci-stat__label { margin-top: var(--space-0-5); }
+
+/* --- toolbar --- */
+.ci-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.ci-toolbar__spacer { margin-left: auto; }
+.ci-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  cursor: pointer;
+  font: inherit;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+.ci-btn:hover { background: var(--color-bg-muted-hover); }
+.ci-btn[aria-pressed="true"] {
+  background: var(--color-accent-bg-strong);
+  border-color: var(--color-accent);
+}
+/* A minor display option, not a filter: the low-emphasis idiom from the
+   ThemeToggle radio-group variant — transparent and muted until it is on. */
+.ci-toolbar__quiet {
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  padding: var(--space-1) var(--space-2);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.ci-toolbar__quiet:hover { color: var(--fg); }
+.ci-toolbar__quiet[aria-pressed="true"] {
+  background: var(--color-bg-muted);
+  color: var(--fg);
+}
+
+/* ThemeToggle, icon-cycle variant — the component's documented visual spec.
+   Two tokens are re-pointed because that spec places the control in the
+   always-dark app header, and here it sits on the page surface:
+   --color-header-text -> --fg, and --color-nav-hover -> --color-bg-muted-hover. */
+.ci-theme-toggle {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: var(--space-2);
+  transition: all var(--transition-fast);
+}
+.ci-theme-toggle svg {
+  fill: none;
+  height: var(--icon-size-lg);
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: var(--icon-size-lg);
+}
+.ci-theme-toggle:hover {
+  background: var(--color-bg-muted-hover);
+  border-color: var(--muted);
+}
+.ci-theme-toggle:active { transform: scale(0.95); }
+.ci-theme-toggle:focus-visible {
+  box-shadow: 0 0 0 0.125rem var(--color-accent);
+  outline: none;
+}
+
+/* --- cards --- */
+.ci-grid {
+  align-items: start;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+/* Cards differ in height because repos differ in workflow count. The script adds
+   this modifier and gives each card a row span, so a short card no longer
+   reserves the height of the tallest in its row. */
+.ci-grid--masonry { grid-auto-rows: 4px; row-gap: 0; }
+
+.ci-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+}
+.ci-card--critical { border-color: var(--color-error); }
+.ci-card--flaky { border-color: var(--color-warning); }
+.ci-card--unreachable { border-style: dashed; }
+.ci-card__head {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+.ci-card__head h2 {
+  font-size: var(--font-size-section-title);
+  font-weight: var(--font-weight-semibold);
+}
+.ci-card__head a { text-decoration: none; }
+.ci-card__head a:hover { color: var(--color-accent); }
+.ci-card__desc {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--muted);
+  display: -webkit-box;
+  font-size: var(--font-size-caption);
+  margin: var(--space-1) 0 var(--space-4);
+  overflow: hidden;
+}
+.ci-card__body { display: flex; flex-direction: column; gap: var(--space-3); }
+.ci-card__foot {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+}
+/* Each project publishes its own status when it builds, so a quiet project's
+   file is legitimately old. Saying so is the difference between "green" and
+   "green as of three weeks ago". */
+.ci-card__foot--stale { color: var(--color-warning); }
+
+/* --- workflow rows --- */
+.ci-wf {
+  align-items: center;
+  display: grid;
+  gap: var(--space-1) var(--space-2);
+  grid-template-columns: minmax(64px, auto) auto 1fr;
+}
+.ci-wf__name {
+  font-size: var(--font-size-card-header);
+  font-weight: var(--font-weight-semibold);
+}
+.ci-wf__when { color: var(--muted); font-size: var(--font-size-caption); }
+.ci-wf__path {
+  color: var(--color-structural);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-caption);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ci-wf__empty { color: var(--muted); font-size: var(--font-size-caption); }
+.ci-wf__stats {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--font-size-caption);
+  gap: var(--space-3);
+  grid-column: 1 / -1;
+}
+.ci-wf__stat b { color: var(--fg); font-weight: var(--font-weight-semibold); }
+.ci-wf__stat--flaky::after {
+  color: var(--color-warning);
+  content: " flaky";
+  font-weight: var(--font-weight-semibold);
+}
+.ci-wf__fail {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  grid-column: 1 / -1;
+}
+.ci-wf__fail a { color: var(--color-link); }
+.ci-wf__fail a:hover { color: var(--color-link-hover); }
+
+/* --- chips: geometry from the package's chip component --- */
+.ci-chip {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-semibold);
+  gap: var(--space-1);
+  justify-content: center;
+  line-height: 1;
+  padding: var(--space-1) var(--space-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ci-chip svg {
+  fill: none;
+  height: var(--icon-size-xs);
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+  width: var(--icon-size-xs);
+}
+.ci-chip--good { background: var(--ci-good-bg); color: var(--ci-good); }
+.ci-chip--critical { background: var(--ci-critical-bg); color: var(--ci-critical-text); }
+.ci-chip--flaky,
+.ci-chip--running { background: var(--ci-warn-bg); color: var(--ci-warn); }
+.ci-chip--idle,
+.ci-chip--unreachable { background: var(--ci-idle-bg); color: var(--ci-idle); }
+
+.ci-spin { animation: ci-spin 1.4s linear infinite; transform-origin: 50% 50%; }
+@keyframes ci-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ci-spin { animation: none; } }
+
+/* --- run strip: one bar per run, newest right. Height carries the verdict as
+       well as colour, so it survives greyscale and colour blindness. --- */
+.ci-strip {
+  align-items: flex-end;
+  display: flex;
+  gap: 2px;
+  grid-column: 1 / -1;
+  height: 26px;
+  margin-top: var(--space-0-5);
+}
+.ci-strip--empty {
+  align-items: center;
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+}
+.ci-strip__run {
+  align-items: flex-end;
+  display: flex;
+  flex: 1 1 0;
+  height: 100%;
+  max-width: 13px;
+  min-width: 5px;
+}
+.ci-strip__run i { border-radius: var(--radius-xs); display: block; width: 100%; }
+.ci-strip__run--good i { background: var(--ci-good); height: 45%; }
+.ci-strip__run--critical i { background: var(--ci-critical); height: 100%; }
+.ci-strip__run--running i {
+  background: repeating-linear-gradient(45deg,
+    var(--ci-warn) 0 3px, var(--color-bg-muted) 3px 6px);
+  height: 72%;
+}
+.ci-strip__run--idle i { background: var(--ci-idle); height: 22%; }
+.ci-strip__run:hover i { filter: brightness(1.15); }
+
+/* --- table view --- */
+.ci-table__wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+.ci-table { border-collapse: collapse; font-size: var(--font-size-body); width: 100%; }
+.ci-table th,
+.ci-table td {
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  white-space: nowrap;
+}
+.ci-table tbody tr:hover { background: var(--color-row-hover); }
+.ci-table tbody tr:last-child td { border-bottom: 0; }
+/* Qualified so it outranks the `.ci-table th, .ci-table td` rule above. */
+.ci-table th.ci-table__num,
+.ci-table td.ci-table__num { font-variant-numeric: tabular-nums; text-align: right; }
+.ci-flag { color: var(--color-warning); font-weight: var(--font-weight-semibold); }
+
+/* --- notices and legend --- */
+.ci-note {
+  align-items: baseline;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  display: flex;
+  font-size: var(--font-size-caption);
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+.ci-note svg {
+  fill: none;
+  flex: none;
+  height: var(--icon-size-xs);
+  stroke: var(--muted);
+  stroke-linecap: round;
+  stroke-width: 2.1;
+  width: var(--icon-size-xs);
+}
+.ci-note b { color: var(--fg); font-weight: var(--font-weight-semibold); }
+.ci-note--error { border-color: var(--color-error); }
+.ci-note--error svg { stroke: var(--color-error); }
+
+.ci-legend {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--font-size-caption);
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.ci-legend__key { align-items: flex-end; display: inline-flex; gap: var(--space-1); height: 14px; }
+.ci-legend__key i { border-radius: var(--radius-xs); display: block; width: 6px; }
+
+/* Shown until the first project resolves, and replaced by a note if none do. */
+.ci-loading {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+
+/* --- shared chrome across the dashboards --- */
+.ci-page__crumb {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  margin-bottom: var(--space-1);
+}
+.ci-page__crumb a { color: var(--color-link); text-decoration: none; }
+.ci-page__crumb a:hover { text-decoration: underline; }
+
+.ci-index { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.ci-index a {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: block;
+  padding: var(--space-4);
+  text-decoration: none;
+}
+.ci-index a:hover { border-color: var(--color-accent); }
+.ci-index h2 { font-size: var(--font-size-section-title); font-weight: var(--font-weight-semibold); }
+.ci-index p { color: var(--muted); font-size: var(--font-size-caption); margin-top: var(--space-1); }
+/* Not links: a placeholder that looks clickable is worse than one that does not. */
+.ci-index__soon {
+  background: var(--color-bg-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  display: block;
+  padding: var(--space-4);
+}
+.ci-index__soon h2 {
+  color: var(--muted);
+  font-size: var(--font-size-section-title);
+  font-weight: var(--font-weight-semibold);
+}
+.ci-index__soon h2::after {
+  color: var(--muted);
+  content: " · not built yet";
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+}
+.ci-index__soon p { color: var(--muted); font-size: var(--font-size-caption); margin-top: var(--space-1); }

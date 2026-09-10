@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CI · codesweep-ai dashboards</title>
+<script>
+/* Resolve the theme before first paint: URL -> stored mode -> system preference.
+   A port of themeBootScript() from @codesweep-ai/ui, which the package documents
+   as the way to avoid a flash of the wrong theme (INSTALL.md step 4). */
+(function () {
+  var k = "ci-dashboard-theme";
+  var ok = function (v) { return v === "light" || v === "dark" || v === "system"; };
+  var m = null;
+  try {
+    var q = new URLSearchParams(location.search).get("theme");
+    if (ok(q)) m = q;
+  } catch (e) { /* URL may be unparseable */ }
+  if (!m) {
+    try {
+      var st = localStorage.getItem(k);
+      if (ok(st)) m = st;
+    } catch (e) { /* localStorage may be unavailable */ }
+  }
+  if (!m) m = "system";
+  var r = m === "system"
+    ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : m;
+  document.documentElement.setAttribute("data-theme", r);
+  document.documentElement.setAttribute("data-theme-mode", m);
+})();
+</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<div class="ci-page">
+
+  <div class="ci-page__top">
+    <div>
+      <div class="ci-page__crumb"><a href="./">dashboards</a> / ci</div>
+      <h1 id="title">Continuous integration</h1>
+      <div class="ci-page__sub">GitHub Actions · default branches · last
+        <span id="window">—</span> runs per workflow · assembled
+        <span id="generated">—</span> from each project's published status</div>
+    </div>
+    <button class="ci-theme-toggle" id="theme" data-component="ThemeToggle"
+            aria-label="Toggle theme. Current: system"></button>
+  </div>
+
+  <section class="ci-hero">
+    <div>
+      <div class="ci-hero__figure" id="hero">—</div>
+      <div class="ci-hero__note" id="hero-note">loading…</div>
+    </div>
+    <div class="ci-hero__tiles">
+      <div><div class="ci-stat__value" id="stat-pass">—</div>
+        <div class="ci-stat__label text-label-upper">Pass rate</div></div>
+      <div><div class="ci-stat__value" id="stat-failed">—</div>
+        <div class="ci-stat__label text-label-upper">Failed runs</div></div>
+      <div><div class="ci-stat__value" id="stat-runs">—</div>
+        <div class="ci-stat__label text-label-upper">Runs counted</div></div>
+      <div><div class="ci-stat__value" id="stat-workflows">—</div>
+        <div class="ci-stat__label text-label-upper">Workflows</div></div>
+    </div>
+  </section>
+
+  <div id="notices"></div>
+
+  <div class="ci-toolbar">
+    <button class="ci-btn" id="only-bad" aria-pressed="false"
+            title="Show only repositories that are failing or flaky">Needs attention only</button>
+    <span class="ci-toolbar__spacer"></span>
+    <button class="ci-toolbar__quiet" id="show-never" aria-pressed="false"
+            title="List workflows that are declared but have never run">show never-run</button>
+    <button class="ci-btn" id="v-cards" aria-pressed="true">Cards</button>
+    <button class="ci-btn" id="v-table" aria-pressed="false">Table</button>
+  </div>
+
+  <div class="ci-loading" id="loading">Loading each project's published status…</div>
+
+  <div class="ci-grid" id="cards"></div>
+
+  <div class="ci-table__wrap" id="table" hidden>
+    <table class="ci-table">
+      <thead><tr>
+        <th class="text-label-upper">Repository</th>
+        <th class="text-label-upper">Workflow</th>
+        <th class="text-label-upper">State</th>
+        <th class="text-label-upper ci-table__num">Pass</th>
+        <th class="text-label-upper ci-table__num">Runs</th>
+        <th class="text-label-upper ci-table__num">Failed</th>
+        <th class="text-label-upper ci-table__num">Median</th>
+        <th class="text-label-upper">Last run</th>
+        <th class="text-label-upper">Last failure</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="ci-legend">
+    <span>Each bar is one run, oldest left:</span>
+    <span class="ci-legend__key"><i style="height:6px;background:var(--ci-good)"></i> passed</span>
+    <span class="ci-legend__key"><i style="height:14px;background:var(--ci-critical)"></i> failed</span>
+    <span class="ci-legend__key"><i style="height:10px;background:var(--ci-warn)"></i> running</span>
+    <span class="ci-legend__key"><i style="height:4px;background:var(--ci-idle)"></i> cancelled or skipped</span>
+    <span>Hover a bar for the commit; click to open it on GitHub.</span>
+  </div>
+</div>
+
+<script src="ci.js"></script>
+</body>
+</html>
