@@ -848,8 +848,8 @@ The configuration also carries three policies:
 ## Mechanisms and prior art
 
 The dependencies page borrows most of what it does from existing projects and products. Each mechanism
-below says what the collector or the page does, then how others do the same job. The comparisons are
-about approach, and each approach buys something different.
+below has a table of how others do the same job, and its last row says how this dashboard does it. The
+comparisons are about approach, and each approach buys something different.
 
 These are the projects and products it is compared with:
 
@@ -878,9 +878,7 @@ These are the projects and products it is compared with:
 
 ### Finding dependencies
 
-The collector clones each default branch without file contents, then checks out only the files a
-manifest can live in. An extractor per format turns them into records. A version no extractor finds is
-declared in `deps-config.json` with a regular expression, or named in the project by a Renovate annotation.
+How a tool finds what a project depends on.
 
 | Who | How |
 |---|---|
@@ -891,16 +889,11 @@ declared in `deps-config.json` with a regular expression, or named in the projec
 | Grype, Trivy | They scan a directory or an image, which finds installed packages that no manifest names. |
 | ScanCode.io | Its pipelines scan a codebase or a container image, and write a CycloneDX SBOM of the packages they find. |
 | AboutCode `.ABOUT` files | A small text file beside vendored code states its name, version, purl and license. |
-
-Reading git finds declared pins without building a project or pulling an image, and needs nothing added
-to the project. A package an image installs only as another package's dependency stays out of view. A
-vendored copy is seen when an `.ABOUT` file beside it says what it is.
+| **This dashboard** | It clones each default branch without file contents and reads only the files a manifest can live in, so nothing is built, pulled or added to a project. A version kept elsewhere is declared in `deps-config.json`, a Renovate annotation or an `.ABOUT` file. A package an image installs only as another's dependency is missed. |
 
 ### Freshness
 
-Versions compare as numbers, and a pin with fewer components floats inside what it names. A record that
-is behind counts its libyears. Chromium's release-age windows raise a version gap's level once the newer
-release has been out long enough.
+How a tool says a dependency is behind.
 
 | Who | How |
 |---|---|
@@ -908,15 +901,11 @@ release has been out long enough.
 | libyear, CHAOSS | Libyears sum drift into one number per project. |
 | Chromium | Its policy states how long bundled third-party code may trail upstream. |
 | Anitya, Repology | They map upstream releases onto distribution packages. |
-
-This page opens no pull request. Each verdict names the command or edit that makes the change instead,
-and one card covers the same change across every project.
+| **This dashboard** | Versions compare as numbers, and libyears measure drift. Chromium's release-age windows raise a gap's level as the newer release ages. It opens no pull request: each action names the command or edit, once for every project it spans. |
 
 ### Release lines and end of life
 
-Support dates come from endoflife.date, by product or by package identifier. Where it has no data, the
-collector reads the publisher's own policy: Firecracker's release and guest kernel tables, GitHub's
-runner-images table, nodejs.org and go.dev.
+Where support dates come from.
 
 | Who | How |
 |---|---|
@@ -924,16 +913,11 @@ runner-images table, nodejs.org and go.dev.
 | xeol | It matches an SBOM or an image against endoflife.date's data. |
 | Docker Scout | It recommends a newer base image tag for an image it scans. |
 | Chainguard | Its images are rebuilt as upstream releases land, so freshness becomes the image publisher's job. |
-
-A support end known only as a floor is drawn as one, and a guest kernel is checked against the lines
-Firecracker supports.
+| **This dashboard** | It reads endoflife.date by product or package identifier, and the publisher's own policy where that has none: Firecracker, GitHub's runner images, nodejs.org and go.dev. A support end known only as a floor is shown as one. A guest kernel is checked against the lines Firecracker supports. |
 
 ### Vulnerabilities
 
-Advisories come from OSV for Go modules, the Go standard library, npm packages and PyPI. A Fedora package
-is vulnerable when Bodhi, Fedora's update system, pushed a security update after the image was built. The
-release a record should move to is looked up in OSV as well, so the fix the page names has no advisory of
-its own where one is known.
+Where advisories come from, and how a fix is chosen.
 
 | Who | How |
 |---|---|
@@ -943,30 +927,22 @@ its own where one is known.
 | Grype, Trivy, Docker Scout | They match the distribution packages inside an image against each distribution's security data. |
 | Snyk | It matches against its own curated database. |
 | VulnerableCode | It aggregates advisories by purl, and names the next version no advisory affects. |
-
-Matching a Fedora package by its update history needs no image pull. A package installed only as another's
-dependency is missed. Checking the fix follows VulnerableCode's idea, with OSV as the database.
+| **This dashboard** | Advisories come from OSV for Go, npm and PyPI. A Fedora package is vulnerable when Bodhi pushed a security update after its image was built, which needs no image pull. The proposed fix is looked up in OSV too, as VulnerableCode does, so it has no advisory of its own. A package installed only as another's dependency is missed. |
 
 ### Reachability
 
-govulncheck reads each Go project's packages and says whether its code calls what an advisory names. An
-advisory nothing calls drops to `warning`, or to `serious` when it is exploited in the wild, and stays on
-the record.
+Whether a project's code calls what an advisory names.
 
 | Who | How |
 |---|---|
 | govulncheck | It analyses calls down to the vulnerable function, for Go only. |
 | osv-scanner | Its call analysis for Go uses govulncheck's analysis. |
 | Endor Labs, Snyk | They trace calls to vulnerable functions in several languages, as commercial services. |
-
-npm advisories carry no reachability here, so every one of them is treated as called.
+| **This dashboard** | It runs govulncheck over each Go project. An advisory nothing calls drops to `warning`, or to `serious` when it is exploited in the wild, and stays on the record. npm advisories have no reachability, so each counts as called. |
 
 ### License policy
 
-Licenses come from deps.dev for packages and from spec files for Fedora packages. Each SPDX expression is
-graded against the policy in `deps-config.json`, and only what a project ships is graded as shipped. A
-license the policy does not name stays `unknown`, with its LicenseDB category shown as a hint.
-ClearlyDefined says what scans found in a shipped package's files.
+How licenses are found and graded.
 
 | Who | How |
 |---|---|
@@ -976,14 +952,11 @@ ClearlyDefined says what scans found in a shipped package's files.
 | ScanCode, ClearlyDefined | ScanCode finds license text in a package's files. ClearlyDefined serves those results with a score for how clearly a package is licensed. |
 | ScanCode LicenseDB | It sorts licenses into categories such as permissive, copyleft and proprietary, as static JSON. |
 | DejaCode, ScanCode.io | Usage policies attach to licenses and packages, and flag what a product must not ship. |
-
-The collector scans no file itself. It reads what ClearlyDefined's scans of published packages found,
-which covers npm, Go and PyPI packages that ClearlyDefined has harvested.
+| **This dashboard** | Declared licenses come from deps.dev, and from spec files for Fedora packages. Each SPDX expression is graded against `deps-config.json` alone, and only what a project ships counts. A license the policy does not name stays `unknown`, with its LicenseDB category as a hint. It scans no file itself: ClearlyDefined's scans show what shipped packages' files carry. |
 
 ### Supply chain signals
 
-Signals are what public sources already say about a dependency: registry deprecation, lockfile install
-scripts, release age, OpenSSF Scorecard results, build provenance and third-party actions pinned by tag.
+How a tool flags risk beyond a dependency's version.
 
 | Who | How |
 |---|---|
@@ -991,25 +964,21 @@ scripts, release age, OpenSSF Scorecard results, build provenance and third-part
 | deps.dev | It serves Scorecard results, deprecation and provenance attestations per package version. |
 | Socket | Static analysis of package code flags install scripts, network access, obfuscation and typosquats. Its API needs an account. |
 | zizmor | It audits GitHub Actions workflows, unpinned third-party actions included. |
-
-The code inside a package is not analysed, which is the part of Socket's signal that needs its service.
+| **This dashboard** | Only what public sources already say: deprecation, lockfile install scripts, release age, OpenSSF Scorecard results, provenance and third-party actions pinned by tag. Package code is not analysed, which is the part of Socket's signal that needs its service. |
 
 ### Internal lag
 
-A pin on a sibling counts the commits the sibling's default branch has made since. An action pinned by
-commit counts only commits under its own directory, and an image counts newer tier builds. A project's
-card shows its pins on siblings and who pins it.
+How far a pin on a sibling project trails it.
 
 | Who | How |
 |---|---|
 | Renovate | Digest updates move commit pins and Go pseudo-versions forward, one pull request at a time. |
 | Go's moddeps test | The test fails when a vendored module trails its newest version. |
+| **This dashboard** | It counts the commits the sibling's default branch has made since the pin: under an action's own directory for an action, and newer tier builds for an image. A project's card shows its pins on siblings and who pins it. |
 
 ### Grouping and ordering work
 
-The page turns verdicts into actions. Dependencies from one upstream repository share a card, and the
-same change across projects is one card. Tiers say when to act. Within a tier, work is ordered by level,
-then by exploitation, then by EPSS, then by gap age.
+How findings become work, and in what order.
 
 | Who | How |
 |---|---|
@@ -1018,24 +987,22 @@ then by exploitation, then by EPSS, then by gap age.
 | Snyk | A priority score weighs severity, exploit maturity and reachability. |
 | Endor Labs | A funnel narrows findings to those that are reachable and fixable. |
 | VulnerableCode | A risk score multiplies weighted severity by exploitability. Exploitability rises for a CVE in CISA's catalog of known exploited vulnerabilities, or with a high FIRST EPSS score. |
-
-EPSS, the Exploit Prediction Scoring System, estimates how likely a CVE is to be exploited. Here, a
-listing in CISA's KEV catalog raises an advisory to `critical`, and EPSS orders work without changing a
-level. A score multiplying the two, as VulnerableCode's does, would be harder to read off a card.
+| **This dashboard** | Dependencies from one upstream repository share a card, and one change across projects is one card. Tiers say when to act. Within a tier, work is ordered by level, then exploitation, EPSS and gap age. A listing in CISA's KEV catalog makes an advisory `critical`, and EPSS orders work without changing a level. |
 
 ### Gap age and fix-by dates
 
-Each gap is dated from its public start. Fix-by dates exist only when the configuration sets a policy.
+How long a gap has been open, and when it is due.
 
 | Who | How |
 |---|---|
 | Dependency-Track | A finding records when it was first attributed to a component. |
 | Snyk, Sonatype Lifecycle | Reports measure open issues against remediation targets. |
 | GitHub security campaigns | A campaign gives a set of alerts a due date. |
+| **This dashboard** | Each gap is dated from its public start: the advisory, the end of life or the release. Fix-by dates exist only when `deps-config.json` sets a policy. |
 
 ### Accepted exceptions
 
-An acceptance in `deps-config.json` names a finding, one of Dependabot's reasons and a date it lapses.
+How a finding is left be on purpose.
 
 | Who | How |
 |---|---|
@@ -1045,23 +1012,22 @@ An acceptance in `deps-config.json` names a finding, one of Dependabot's reasons
 | Snyk | A `.snyk` policy file ignores an issue until a date. |
 | Dependency-Track | Analysis states and VEX justifications record why a finding does not apply. VEX, the Vulnerability Exploitability eXchange, is a standard way to say so. |
 | DejaCode | A vulnerability analysis per product records its state and justification in VEX terms. |
+| **This dashboard** | An entry in `deps-config.json` names the finding, one of Dependabot's reasons and a date it lapses. The SBOM carries it as a VEX analysis. |
 
 ### Alerting
 
-`deps-feed.xml` is an Atom feed of what needs fixing now.
+How people hear about new work.
 
 | Who | How |
 |---|---|
 | Dependabot | Alerts arrive as GitHub notifications. |
 | Dependency-Track | Notifications go out by webhook, email or chat integration. |
 | Anitya | New upstream releases are published as messages on Fedora's message bus. |
-
-A feed needs no secret in the build and no account for the reader. Email and chat would need both.
+| **This dashboard** | `deps-feed.xml` is an Atom feed with one entry per action to fix now. It needs no secret in the build and no account for the reader, where email and chat would need both. |
 
 ### Sharing findings with other tools
 
-`deps.cdx.json` is the inventory as a CycloneDX SBOM. Each record carries a purl, and each advisory a VEX
-analysis where the collector has one.
+How findings reach other tools.
 
 | Who | How |
 |---|---|
@@ -1069,17 +1035,18 @@ analysis where the collector has one.
 | ScanCode.io | Its `load_sbom` pipeline imports CycloneDX and SPDX documents. |
 | osv-scanner | It scans an SBOM's purls against OSV. |
 | GitHub | The dependency graph exports a repository's SBOM as SPDX. |
+| **This dashboard** | `deps.cdx.json` is the inventory as a CycloneDX SBOM, with a purl on each record and a VEX analysis on each advisory where one is known. `deps-actions.json` gives agents the page's actions. |
 
 ### Presentation
 
-The page is static and reads one same-origin file. It opens on the next action, puts urgency in three
-tiers, and keeps reference detail closed until it is opened.
+How the work is shown.
 
 | Who | How |
 |---|---|
 | Renovate | A Dependency Dashboard issue per repository lists pending updates as checkboxes. |
 | Dependency-Track | Portfolio views chart risk across projects over time. |
 | Snyk, Socket | Hosted dashboards list findings by organisation and project. |
+| **This dashboard** | A static page reads one same-origin file. It opens on the next action, puts urgency in three tiers, and keeps reference detail closed until it is opened. |
 
 ## What a page may assume
 
