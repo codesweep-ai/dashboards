@@ -1,0 +1,36 @@
+# The CI dashboard: check the page's list of projects, and hand over its files.
+#
+# pages.yml calls this as one step of publishing the site, so a run shows the CI
+# dashboard as its own workflow. The page gathers each project's status file in
+# the browser at load time, so nothing is collected here: a build elsewhere needs
+# nothing from this repository.
+name: CI dashboard
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read # the page is built from the tree and nothing is written back
+
+jobs:
+  check:
+    name: check the CI dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # A project whose status path is absolute or cross-origin would be fetched
+      # from somewhere the page must not call. SPEC.md's index rules say why.
+      - name: check projects.json
+        run: python3 scripts/check-projects.py projects.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-ci
+          path: |
+            ci.html
+            ci.js
+            projects.json
+          if-no-files-found: error

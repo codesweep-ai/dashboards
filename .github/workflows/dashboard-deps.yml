@@ -1,0 +1,75 @@
+# The dependencies dashboard: collect deps.json and what is written beside it.
+#
+# pages.yml calls this as one step of publishing the site, so a run shows the
+# collection as its own workflow, with its own log and its own result. Run it on
+# its own, from the Actions tab, to see what the next publish would show without
+# deploying anything: the files are left as the run's artifact.
+#
+# What it reports moves without anyone committing: a registry publishes a
+# release, a runtime reaches its end of life, an advisory lands. So it reads each
+# project's default branch and the public registries again on every run.
+name: dependencies dashboard
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read # the collector reads this tree and public sources, and writes nothing back
+
+jobs:
+  collect:
+    name: collect the dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # For govulncheck, which the collector builds from the pin in go.mod and
+      # runs over each Go project. GOTOOLCHAIN=auto lets a project's own go
+      # directive fetch the toolchain it asks for.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The collector clones each project over plain git and asks public
+      # sources about every dependency. The job's own token lifts GitHub's
+      # limits for a shared runner; nothing else here needs a credential, and
+      # no personal access token exists anywhere in this design.
+      #
+      # --previous carries the published file's history forward, so the trend
+      # lives in the deployment and never enters the repository. It also holds
+      # the facts about exact versions that a run need not ask for again.
+      #
+      # deps-actions.json is every recommended change, for an agent to make.
+      # deps-feed.xml is the alert channel, an Atom feed any reader can follow.
+      # deps.cdx.json is the same inventory as a CycloneDX SBOM with VEX.
+      - name: run the collector
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GOTOOLCHAIN: auto
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python3 -m collector --output deps.json --actions deps-actions.json --feed deps-feed.xml --sbom deps.cdx.json
+          --previous https://codesweep.ai/dashboards/deps.json
+
+      # A file that does not match SPEC.md would publish a broken page or mislead
+      # an agent, so it stops here rather than at deploy.
+      - name: check the files match SPEC.md
+        run: |
+          python3 scripts/check-deps.py deps.json
+          python3 scripts/check-deps.py deps-actions.json
+
+      # The page and its data travel together, so the site is assembled from what
+      # this run checked.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-deps
+          path: |
+            deps.html
+            deps.js
+            deps.json
+            deps-actions.json
+            deps-feed.xml
+            deps.cdx.json
+          if-no-files-found: error

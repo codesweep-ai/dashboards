@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dependencies · codesweep-ai dashboards</title>
+<script>
+/* Resolve the theme before first paint: URL -> stored mode -> system preference.
+   A port of themeBootScript() from @codesweep-ai/ui, which the package documents
+   as the way to avoid a flash of the wrong theme (INSTALL.md step 4). The key is
+   shared with the CI page, so one choice follows the reader across the site. */
+(function () {
+  var k = "ci-dashboard-theme";
+  var ok = function (v) { return v === "light" || v === "dark" || v === "system"; };
+  var m = null;
+  try {
+    var q = new URLSearchParams(location.search).get("theme");
+    if (ok(q)) m = q;
+  } catch (e) { /* URL may be unparseable */ }
+  if (!m) {
+    try {
+      var st = localStorage.getItem(k);
+      if (ok(st)) m = st;
+    } catch (e) { /* localStorage may be unavailable */ }
+  }
+  if (!m) m = "system";
+  var r = m === "system"
+    ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : m;
+  document.documentElement.setAttribute("data-theme", r);
+  document.documentElement.setAttribute("data-theme-mode", m);
+})();
+</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="dashboard.css">
+<!-- What this page shows, as data: the actions file is written for an agent to follow. -->
+<link rel="alternate" type="application/json" href="deps-actions.json" title="Dependency actions, for agents">
+<link rel="alternate" type="application/json" href="deps.json" title="Dependencies">
+</head>
+<body>
+<div class="ci-page">
+
+  <div class="ci-page__top">
+    <div>
+      <div class="ci-page__crumb"><a href="./">dashboards</a><span id="crumb-tail"> / deps</span></div>
+      <h1>Dependencies</h1>
+      <div class="ci-page__sub">Go · npm · actions · toolchains · images and runners · system packages · native pins ·
+        read from each project's default branch and checked against public registries
+        <span id="generated">—</span></div>
+    </div>
+    <button class="ci-theme-toggle" id="theme" data-component="ThemeToggle"
+            aria-label="Toggle theme. Current: system"></button>
+  </div>
+
+  <section class="ci-hero" id="hero-wrap">
+    <div>
+      <div class="ci-hero__figure" id="hero">—</div>
+      <div class="ci-hero__note" id="hero-note">loading…</div>
+    </div>
+    <div class="ci-hero__tiles dp-tiles" id="tiles"></div>
+  </section>
+
+  <div id="notices"></div>
+
+  <div class="ci-toolbar dp-toolbar--views">
+    <div class="dp-segmented" id="views" role="radiogroup" aria-label="View" data-component="SegmentedControl">
+      <button role="radio" data-segmented-option="projects" aria-checked="false">Projects</button>
+      <button role="radio" data-segmented-option="upgrades" aria-checked="false">Upgrades</button>
+      <button role="radio" data-segmented-option="internal" aria-checked="false">Internal</button>
+      <button role="radio" data-segmented-option="lifecycle" aria-checked="false">Lifecycle</button>
+      <button role="radio" data-segmented-option="inventory" aria-checked="false">Inventory</button>
+    </div>
+  </div>
+
+  <div class="ci-loading" id="loading">Loading the collected dependencies…</div>
+
+  <main id="main"></main>
+
+  <div class="dp-legend" id="legend"></div>
+  <footer class="dp-footer" id="footer"></footer>
+</div>
+
+<div class="dp-tooltip" id="tooltip" role="tooltip" data-component="Tooltip" data-part="bubble" hidden></div>
+
+<script src="deps.js"></script>
+</body>
+</html>

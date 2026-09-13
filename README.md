@@ -9,8 +9,10 @@
 This repository holds the web pages that show how the codesweep-ai projects on GitHub are doing.
 The set will grow.
 
-The first is **Continuous integration**, at
-**[https://codesweep.ai/dashboards/ci](https://codesweep.ai/dashboards/ci)**.
+- **Continuous integration**, at
+  **[https://codesweep.ai/dashboards/ci](https://codesweep.ai/dashboards/ci)**.
+- **Dependencies**, at
+  **[https://codesweep.ai/dashboards/deps](https://codesweep.ai/dashboards/deps)**.
 
 ## The CI dashboard page
 
@@ -51,6 +53,113 @@ Because each project publishes independently, the page is explicit about what it
   Nothing refreshes a status on a schedule, deliberately: a cron would update the timestamp without
   updating the facts, hiding a project that has quietly stopped building.
 
+## The dependencies page
+
+The page says where each project's dependencies stand and what to do about them. It covers Go
+modules, npm packages, GitHub Actions, toolchains, container images, Fedora packages and native pins
+such as the Firecracker release and the guest kernel. CI runners count too, macOS and self-hosted ones
+included.
+
+It opens on **Projects**. The **Next action** card names the most urgent change across the org, with the
+command that makes it, and a short list follows it. A card per project links to its own page. A
+project's page starts with what to do in that project, in three tiers of urgency: fix now, plan and
+routine. Below that, closed until opened, sit its advisories, licenses, supply chain signals, pins on
+siblings, release lines and every dependency it has. Each row opens onto the detail behind it.
+
+Four more views show the whole org another way:
+
+- **Upgrades** turns every verdict into an action, in the same three tiers. One change across several
+  projects is one card, such as a React major or a lockfile to refresh. A tag says what kind of work it
+  is, and each card says which command or edit makes the change. The exceptions accepted in
+  `deps-config.json` are listed below the tiers, with when each lapses.
+- **Internal** gives each project a card of its pins on siblings, and of who pins it in turn.
+- **Lifecycle** puts every runtime, OS release, runner image, kernel line and supported library on one
+  calendar, and names what publishes no support window.
+- **Inventory** lists every tracked dependency, with a filter. Indirect dependencies are included on
+  request. Their advisories are checked, and their newest release is not looked up, so they read as not
+  compared.
+
+The headline counts the projects with something to fix now. A [libyear](https://libyear.com/) is the
+time between a pinned release and the newest one, and the tiles add them up across the org.
+
+A verdict comes with the evidence a reviewer would ask for:
+
+- **Exploitation.** An advisory CISA lists as exploited in the wild is fixed now, wherever it runs. The
+  rest are ordered by EPSS, a public estimate of how likely an exploit is.
+- **Reachability.** govulncheck, the Go team's scanner, says whether a project's code calls what a Go
+  advisory names. An advisory nothing calls moves from fix now to plan.
+- **Clean fixes.** The release a card suggests is looked up too, so it has no advisory of its own.
+- **Licenses.** Each license is graded against the policy in `deps-config.json` and nothing else, and a
+  license only matters where the dependency ships. Fedora packages are graded from their spec files. A
+  license the policy does not name becomes a routine action to add it. A stricter license found in a
+  package's own files is shown beside the one it declares.
+- **Supply chain signals.** Deprecated and abandoned packages, install scripts, failing OpenSSF Scorecard
+  checks and actions pinned by a movable tag are all flagged.
+- **How long a gap has been open**, dated from the advisory, the end of life or the release. Fix-by dates
+  appear only when `deps-config.json` sets a policy for them.
+- **Accepted exceptions**, recorded in `deps-config.json` with a reason and a date they lapse.
+
+`deps-feed.xml`, beside the page, is an Atom feed of what needs fixing now. Following it in a feed reader
+is the alert, and needs no account. `deps.cdx.json` is the same inventory as a CycloneDX SBOM, with a VEX
+analysis on each advisory, for tools such as Dependency-Track.
+
+### For agents
+
+`deps-actions.json`, beside the page, is the actions file: every change the page recommends, per project,
+written for an agent to carry out in a clone. Each action lists the commands to run and the edits to make,
+at their file and line. It says what each dependency moves from and to, and when the change counts as
+done. It also carries the `accepted` entry to propose when a change should not be made. An agent needs one GET:
+
+```sh
+curl -s https://codesweep.ai/dashboards/deps-actions.json
+```
+
+[SPEC.md](SPEC.md#the-actions-file) describes every field.
+
+### Where the data comes from
+
+The page reads `deps.json`, the dependencies file, which is published beside it. This site's build
+writes it by running the collector in `collector/`. Each page is generated by a workflow of its own, which
+the Pages workflow calls, so a run shows them as sub-workflows: **dependencies dashboard** and **CI
+dashboard**. Either can also be run alone from the Actions tab, which leaves its files as an artifact
+and deploys nothing. The collector clones each project's default branch
+over plain git and asks public registries about every dependency. It needs no API key. **Sources**, at the
+foot of the page, lists every source and what each gives, and
+[SPEC.md](SPEC.md#information-sources) describes each in full.
+
+```
+github.com/codesweep-ai/<project>     go.mod, package.json, workflows, Containerfiles, …
+proxy.golang.org, registry.npmjs.org, api.osv.dev, api.deps.dev, endoflife.date, CISA KEV, …
+codesweep.ai/dashboards/
+    deps-config.json                  pins no manifest declares
+    deps.json, deps-actions.json,
+    deps-feed.xml, deps.cdx.json      written by the build
+    deps.html + deps.js               render it
+```
+
+Unlike the CI status, the build refreshes this file every day as well as on every push. A dependency
+falls behind without anyone committing: a registry publishes a release, a runtime reaches its end of
+life, an advisory lands. Each run reads the repositories and the registries again, so its timestamp
+never runs ahead of its facts. The page flags a file older than 36 hours.
+
+### Tracking a pin the collector cannot see
+
+Manifests are found without configuration. So is an `ARG *_VERSION` in a Containerfile whose download URL
+names its upstream. A version written anywhere else is invisible until it is declared, in one of two ways:
+
+- **In the project**, with Renovate's annotation on the line above the `ARG`:
+
+  ```dockerfile
+  # renovate: datasource=github-releases depName=firecracker-microvm/firecracker
+  ARG FC_VERSION=1.16.0
+  ```
+
+- **Here**, as a pin in `deps-config.json`: a file, a regular expression for the version, and the
+  upstream to compare it with. This is how a version held in a Go constant is tracked.
+
+A declared pin that stops matching is named on the page rather than dropped. [SPEC.md](SPEC.md) has
+every field, and every other way to declare a version.
+
 ## Local preview
 
 `_preview/` mirrors the `codesweep.ai` layout, so relative paths and same-origin behaviour are
@@ -58,18 +167,23 @@ exercised exactly as in production:
 
 ```sh
 export GH_TOKEN=$(gh auth token)
-make deps status preview
+make deps status dependencies preview
 # then open http://localhost:8732/dashboards/ci.html
+# or        http://localhost:8732/dashboards/deps.html
 ```
 
 The preview server runs no Jekyll and serves no extensionless URLs, so follow `ci.html` rather than
-`ci`. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
+`ci`. `make dependencies` writes `deps.json`, `deps-actions.json`, `deps-feed.xml` and `deps.cdx.json`
+into the tree. It needs no token, and needs Go for govulncheck. It takes a few minutes.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
 
 `?theme=light|dark|system` overrides the theme for one load without saving it.
 
 ## Docs
 
-- [SPEC.md](SPEC.md) · the contract: what a project must publish, and what a page may assume
+- [SPEC.md](SPEC.md) · the contract: what a project must publish, what the dependencies file and the
+  actions file hold, where their information comes from, how it is compared with prior art, and what a
+  page may assume
 - [CONTRIBUTING.md](CONTRIBUTING.md) · working on the pages: previewing a change, the design rules,
   commit shape and writing
 
