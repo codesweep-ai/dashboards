@@ -447,13 +447,71 @@ class Resolver:
                            "url": f"https://bodhi.fedoraproject.org/updates/?packages=kernel&releases=F{fc.group(1)}"}
         dep["behind"] = versions.distance(v.raw, latest_v.raw) if latest_v else None
         if dep.get("compat") == "firecracker-guest":
-            policy = self.src.firecracker_policy()
-            line = ".".join(str(n) for n in v.nums[:2])
-            guests = policy["guest_kernels"]
-            supported = [k for k, g in guests.items() if _date(g["min_support"]) and _date(g["min_support"]) > self.now.date()]
-            dep["compat"] = {"with": "Firecracker", "line": line, "validated": sorted(guests, key=versions.parse),
-                             "supported": sorted(supported, key=versions.parse), "ok": line in supported,
-                             "url": policy["kernel_url"]}
+            dep["compat"] = self._firecracker_guest(v, latest_v, nvr, fc.group(1))
+
+    def _firecracker_guest(self, version, fedora_latest, fedora_nvr, release):
+        """A guest kernel against the lines Firecracker validates, and the line to move to when it is not one.
+
+        Firecracker's table lists each guest line with the first Firecracker
+        release that runs it and a date its support is guaranteed until. The date
+        is a floor, as the release table's is, so a listed line stays validated
+        past it. The line to move to is the listed one guaranteed longest whose
+        upstream line has not ended: in practice the newest long-term line.
+        """
+        policy = self.src.firecracker_policy()
+        guests = policy["guest_kernels"]
+        line = ".".join(str(n) for n in version.nums[:2])
+        today = self.now.date()
+        cycles = {str(r.get("cycle")): r for r in self.src.cycles("linux") or []}
+
+        def ended(cycle):
+            eol = (cycles.get(cycle) or {}).get("eol")
+            return eol is True or bool(isinstance(eol, str) and _date(eol) and _date(eol) <= today)
+
+        listed = sorted(guests, key=versions.parse)
+        live = [g for g in listed if not ended(g)]
+        target = max(live, key=lambda g: (guests[g]["min_support"], versions.parse(g)), default=None)
+        compat = {"with": "Firecracker", "line": line, "validated": listed, "ok": line in guests,
+                  "guaranteed": {g: guests[g]["min_support"] for g in listed},
+                  "requires": {g: guests[g]["min_firecracker"] for g in listed},
+                  "url": policy["kernel_url"]}
+        if target:
+            row = cycles.get(target) or {}
+            compat["target"] = {"line": target, "lts": bool(row.get("lts")),
+                                "eol": row.get("eol") if isinstance(row.get("eol"), str) else None,
+                                "latest": row.get("latest"), "guaranteed": guests[target]["min_support"],
+                                "min_firecracker": guests[target]["min_firecracker"]}
+            # The lines released after the target, and why none of them is the answer.
+            later = sorted((c for c in cycles if versions.parse(c) and versions.parse(target) < versions.parse(c)
+                            and _date(cycles[c].get("releaseDate")) and _date(cycles[c]["releaseDate"]) <= today),
+                           key=versions.parse)
+            compat["newer"] = {"ended": [c for c in later if ended(c)],
+                               "not_validated": [c for c in later if not ended(c) and c not in guests]}
+        if fedora_latest:
+            # Fedora keeps one kernel line current per release, and rebases it,
+            # so its newest stable build names the only line it maintains.
+            fedora_line = ".".join(str(n) for n in fedora_latest.nums[:2])
+            compat["distribution"] = {"name": f"Fedora {release}", "latest": fedora_nvr, "line": fedora_line,
+                                      "has_target": bool(target) and fedora_line == target}
+        return compat
+
+    def link_compat(self, projects):
+        """Name the Firecracker pin a guest kernel's move depends on, and whether it is new enough.
+
+        Firecracker's table says which release first runs each guest line, and
+        the project pins its Firecracker elsewhere, so this looks across records.
+        """
+        for p in projects:
+            fc = next((d for d in p["dependencies"] if d.get("package") == "firecracker-microvm/firecracker"
+                       or d["name"] == "github.com/firecracker-microvm/firecracker"), None)
+            for d in p["dependencies"]:
+                compat = d.get("compat") or {}
+                target = compat.get("target") or {}
+                if compat.get("with") != "Firecracker" or compat.get("ok") or not target or not fc or not fc.get("version"):
+                    continue
+                pinned, needs = versions.parse(fc["version"]), versions.parse(target["min_firecracker"])
+                compat["firecracker"] = {"name": fc["name"], "pinned": fc["version"], "needs": target["min_firecracker"],
+                                         "ok": bool(pinned and needs and not pinned < needs)}
 
     # --- sibling repositories -------------------------------------------------------------
 

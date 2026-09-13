@@ -245,7 +245,17 @@
   }
   function productName(lc) { return (PRODUCT[lc.product] || lc.product) + " " + lc.cycle; }
   function compatText(c) {
-    return c.with + " supports guest kernels " + (c.supported.length ? c.supported.join(", ") : "none") + ", not " + c.line;
+    var t = c.target || {}, dist = c.distribution || {};
+    var s = [c.with + " validates " + ((c.validated || []).join(", ") || "none")];
+    if (t.line) s.push("move to " + t.line + (t.lts ? " LTS" : "") + (t.eol ? " (to " + t.eol + ")" : "") + (t.min_firecracker ? ", needs " + t.min_firecracker + "+" : ""));
+    if (dist.name && !dist.has_target) s.push(dist.name + " ships only " + dist.line);
+    return s.join(" · ");
+  }
+  // One step of an action: a command, an edit at a file and line, or a task in words.
+  function stepText(s) {
+    if (s.run) return "<code>" + esc((s.cwd && s.cwd !== "." ? "cd " + s.cwd + " && " : "") + s.run) + "</code>";
+    if (s.edit) return esc(s.text.charAt(0).toUpperCase() + s.text.slice(1)) + ' <span class="dp-muted">at</span> <code>' + esc(s.edit + (s.line ? ":" + s.line : "")) + "</code>";
+    return esc(s.do || "");
   }
   // What an action says about itself, with a release's age read at view time.
   function whyText(a) {
@@ -372,14 +382,27 @@
     if (vulns.length > 3) refs.push("+" + (vulns.length - 3));
     var up = ["lock", "rebuild", "actions", "routine", "devtools", "sync", "license", "unlisted", "replace"].indexOf(a.kind) >= 0 ? null
       : (a.items[0].dep.upstream || {}).url || (a.items[0].dep.lifecycle || {}).url;
-    var how = a.how ? '<div class="dp-how"><span class="text-label-upper">How</span><code>' + esc(a.how) + "</code></div>" : "";
+    var how = a.steps && a.steps.length
+      ? '<div class="dp-how dp-how--steps"><span class="text-label-upper">Steps</span><ol class="dp-steps">' +
+        a.steps.map(function (s) { return "<li>" + stepText(s) + "</li>"; }).join("") + "</ol></div>"
+      : a.how ? '<div class="dp-how"><span class="text-label-upper">How</span><code>' + esc(a.how) + "</code></div>" : "";
     var evidence = a.evidence.length ? '<p class="dp-action__evidence"><span class="text-label-upper">Also</span> ' + esc(a.evidence.join(" · ")) + "</p>" : "";
+    // The actions to make first, linked where they are shown.
+    var first = (a.requires || []).map(function (id) {
+      var other = (state.project ? (DATA_SET.byName[state.project]._actions || []) : DATA_SET.actions).filter(function (x) { return x.id === id; })[0];
+      return other ? '<a href="' + (state.project ? "#" : "?view=upgrades#") + esc(id) + '">' + esc(other.title) + "</a>" : "";
+    }).filter(Boolean);
+    evidence += first.length ? '<p class="dp-action__evidence"><span class="text-label-upper">First</span> ' + first.join(" · ") + "</p>" : "";
+    // A choice for a person to make: the collector recommends one and picks none.
+    var options = a.options ? '<div class="dp-options"><span class="text-label-upper">Options</span><ul>' + a.options.map(function (o) {
+      return "<li>" + (o.recommended ? chip("good", "current", "recommended") + " " : "") + esc(o.text) + "</li>";
+    }).join("") + "</ul></div>" : "";
     return '<article class="ci-card dp-action dp-card--' + esc(a.level) + '" id="' + esc(a.id) + '" data-eco="' +
       esc(uniq(a.items.map(function (i) { return i.dep.ecosystem; })).join(" ")) + '">' +
       '<div class="dp-action__meta">' + actionMeta(a) + "</div>" +
       '<h3 class="dp-action__title">' + esc(a.title) + "</h3>" +
       '<p class="dp-action__why">' + esc(whyText(a)) + "</p>" +
-      actionItems(a) + evidence + how +
+      actionItems(a) + evidence + how + options +
       ((refs.length || up) ? '<footer class="ci-card__foot">' + (refs.length ? "Advisories " + refs.join(" · ") : "") +
         (up ? (refs.length ? " · " : "") + '<a href="' + esc(up) + '" target="_blank" rel="noopener">upstream ' + ICON.external + "</a>" : "") + "</footer>" : "") +
       "</article>";

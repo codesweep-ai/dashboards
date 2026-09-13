@@ -33,8 +33,13 @@ TYPES = {"security", "eol", "license", "supply", "sync", "update"}
 
 def check_actions(path, where, acts, projects):
     """Actions as SPEC.md describes them: a known kind and tier, and items that name real records."""
+    ids = {a.get("id") for a in acts}
     for a in acts:
         label = f"{where}: action {a.get('id')!r}"
+        if any(r not in ids for r in a.get("requires") or []):
+            fail(path, f"{label}: requires an action that is not in the same list")
+        if any(not o.get("text") for o in a.get("options") or []):
+            fail(path, f"{label}: an option needs a text")
         if a.get("kind") not in KINDS or a.get("tier") not in TIERS or a.get("type") not in TYPES:
             fail(path, f"{label}: unknown kind, tier or type")
         if not a.get("title") or not a.get("items"):
@@ -65,6 +70,9 @@ def check_actions_file(path):
             ids.add(a.get("id"))
             if a.get("tier") not in TIERS or not a.get("changes"):
                 fail(path, f"{label}: needs a tier and changes")
+            earlier = [x["id"] for x in p["actions"][:p["actions"].index(a)]]
+            if any(r not in earlier for r in a.get("requires") or []):
+                fail(path, f"{label}: an action it requires must come before it")
             for s in a.get("steps") or []:
                 if sum(k in s for k in ("run", "edit", "do")) != 1:
                     fail(path, f"{label}: a step is exactly one of run, edit or do, got {s!r}")

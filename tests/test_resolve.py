@@ -194,12 +194,59 @@ class Firecracker(unittest.TestCase):
                                       datasource="github", package="firecracker-microvm/firecracker", scope="build"))
         self.assertEqual((d["lifecycle"]["phase"], d["lifecycle"]["eol"], d["lifecycle"]["eol_is_floor"]), ("eol-soon", "2026-12-03", True))
 
-    def test_the_guest_kernel_is_checked_against_the_lines_firecracker_supports(self):
-        src = FakeSources(cycles=[{"cycle": "6.19", "releaseDate": "2026-02-08", "eol": "2026-04-22"}],
-                          bodhi_latest=("7.2.4-200.fc44", "2026-09-10 00:58:54"), firecracker_policy=POLICY)
-        d = resolver(src).resolve(dep(ecosystem="native", name="kernel", version="6.19.10-300.fc44", datasource="fedora-kernel",
-                                      scope="build", compat="firecracker-guest"))
-        self.assertEqual((d["compat"]["ok"], d["compat"]["supported"]), (False, ["6.18"]))
+    LINUX = [{"cycle": "7.2", "releaseDate": "2026-08-16", "eol": False, "latest": "7.2.5"},
+             {"cycle": "7.1", "releaseDate": "2026-06-14", "eol": "2026-09-02"},
+             {"cycle": "6.19", "releaseDate": "2026-02-08", "eol": "2026-04-22"},
+             {"cycle": "6.18", "releaseDate": "2025-11-30", "eol": "2028-12-31", "lts": True, "latest": "6.18.51"},
+             {"cycle": "6.1", "releaseDate": "2022-12-11", "eol": "2027-12-31", "lts": True, "latest": "6.1.187"}]
+
+    def kernel(self, fedora_latest="7.2.4-200.fc44"):
+        src = FakeSources(cycles=self.LINUX, bodhi_latest=(fedora_latest, "2026-09-10 00:58:54"), firecracker_policy=POLICY)
+        return resolver(src).resolve(dep(ecosystem="native", name="kernel", label="Linux kernel (Fedora guest)",
+                                         version="6.19.10-300.fc44", datasource="fedora-kernel", scope="build",
+                                         compat="firecracker-guest"))
+
+    def test_the_guest_kernel_moves_to_the_long_term_line_firecracker_validates(self):
+        c = self.kernel()["compat"]
+        self.assertEqual((c["ok"], c["validated"], c["target"]["line"], c["target"]["lts"], c["target"]["min_firecracker"]),
+                         (False, ["6.1", "6.18"], "6.18", True, "1.16.1"))
+        # A date in Firecracker's table is a floor: 6.1 is past it and still validated.
+        self.assertIn("6.1", c["validated"])
+        self.assertEqual(c["newer"], {"ended": ["6.19", "7.1"], "not_validated": ["7.2"]})
+        self.assertEqual(c["distribution"], {"name": "Fedora 44", "latest": "7.2.4-200.fc44", "line": "7.2", "has_target": False})
+
+    def test_the_move_names_its_firecracker_upgrade_and_the_choices_fedora_leaves(self):
+        from collector import actions
+        kernel = self.kernel()
+        fc = dep(ecosystem="native", name="github.com/firecracker-microvm/firecracker", package="firecracker-microvm/firecracker",
+                 label="Firecracker", version="1.16.0", status="eol-soon", level="serious", sources=[{"path": "build.go", "line": 73}],
+                 upstream={"latest": "1.17.0"}, lifecycle={"product": "firecracker", "cycle": "1.16", "eol": "2026-12-03", "eol_is_floor": True})
+        kernel["sources"] = [{"path": "build.go", "line": 28}]
+        project = {"name": "sandbox", "repo": {"url": "u"}, "dependencies": [resolver().classify(kernel), fc]}
+        resolver().link_compat([project])
+        self.assertEqual(kernel["compat"]["firecracker"], {"name": fc["name"], "pinned": "1.16.0", "needs": "1.16.1", "ok": False})
+        cards = {a["kind"] + ":" + a["title"]: a for a in actions.build([project])}
+        move = next(a for k, a in cards.items() if "kernel" in a["title"])
+        upgrade = next(a for k, a in cards.items() if "Firecracker" in a["title"])
+        self.assertEqual(move["why"], "Firecracker validates 6.1, 6.18 · 6.18 is LTS to 2028-12-31 · Fedora 44 ships only 7.2")
+        self.assertEqual(move["requires"], [upgrade["key"]])
+        self.assertEqual(move["how"], "Upgrade Firecracker to 1.16.1+ (pinned 1.16.0)")
+        self.assertTrue(move["options"][0]["recommended"])
+        self.assertIn("microvm-kernel-6.18", move["options"][0]["text"])
+        self.assertEqual(upgrade["evidence"][-1], "the 6.18 guest kernel needs 1.16.1+")
+        project["_actions"] = actions.build([project])
+        doc = actions.agent_document({"generated": "2026-09-13T00:00:00Z", "org": "o", "projects": [project]}, "https://x/d/", "spec")
+        ids = [a["id"] for a in doc["projects"][0]["actions"]]
+        kernel_act = next(a for a in doc["projects"][0]["actions"] if "kernel" in a["title"])
+        self.assertLess(ids.index(kernel_act["requires"][0]), ids.index(kernel_act["id"]))
+
+    def test_a_fedora_that_maintains_the_line_gets_an_edit_and_no_options(self):
+        from collector import actions
+        kernel = self.kernel(fedora_latest="6.18.51-200.fc44")
+        self.assertTrue(kernel["compat"]["distribution"]["has_target"])
+        steps = actions.steps_for(kernel)
+        self.assertEqual((steps[-1]["text"], steps[-1]["to"]), ("set the version to 6.18.51-200.fc44", "6.18.51-200.fc44"))
+        self.assertIsNone(actions.compat_options(kernel["compat"]))
 
 
 class Enrichment(unittest.TestCase):

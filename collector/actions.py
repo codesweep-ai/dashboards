@@ -87,8 +87,8 @@ def target(d):
 def move_to(d, items=()):
     """The version one change moves a record to. A security fix keeps the rest of its family on their line."""
     compat = d.get("compat") or {}
-    if compat and not compat.get("ok") and compat.get("supported"):
-        return " or ".join(compat["supported"]) + " line"
+    if compat and not compat.get("ok") and (compat.get("target") or {}).get("line"):
+        return compat["target"]["line"] + " line"
     if d.get("status") == "vulnerable" and d.get("fix"):
         return d["fix"]
     hosts = [i for i in items if i["dep"].get("status") == "vulnerable" and i["dep"].get("fix") and not i["reason"]]
@@ -197,8 +197,7 @@ def steps_for(d, to=None):
         return edit("raise engines.node", **{"from": d.get("constraint") or d.get("version")})
     compat = d.get("compat") or {}
     if compat and not compat.get("ok"):
-        line_text = ("the " + " or ".join(compat["supported"]) + " line") if compat.get("supported") else f"a line {compat.get('with')} supports"
-        return edit(f"set the version to a Fedora kernel build on {line_text}", **{"from": d.get("version"), "to": None})
+        return compat_steps(d, compat, edit)
     if d.get("declared") or d.get("arg"):
         what = d.get("arg") or "the version"
         return edit(f"set {what} to {t or 'the newest release'}" + (", with any checksum beside it" if d.get("arg") else ""),
@@ -246,7 +245,50 @@ def how_text(steps, places=1):
 
 
 def compat_text(c):
-    return f"{c.get('with')} supports guest kernels {', '.join(c.get('supported') or []) or 'none'}, not {c.get('line')}"
+    """Why a pin fails its compatibility check, in the few words a card has room for."""
+    listed = ", ".join(c.get("validated") or []) or "none"
+    target = c.get("target") or {}
+    bits = [f"{c.get('with')} validates {listed}"]
+    if target:
+        bits.append(f"{target['line']} is {'LTS' if target.get('lts') else 'supported'}" +
+                    (f" to {target['eol']}" if target.get("eol") else ""))
+    dist = c.get("distribution") or {}
+    if target and dist and not dist.get("has_target"):
+        bits.append(f"{dist['name']} ships only {dist['line']}")
+    return " · ".join(bits)
+
+
+def compat_steps(d, compat, edit):
+    """The steps that move a pin onto a compatible line: what it depends on, where the build comes from, the edit."""
+    target = compat.get("target") or {}
+    dist = compat.get("distribution") or {}
+    fc = compat.get("firecracker") or {}
+    steps = []
+    if fc and not fc.get("ok"):
+        steps.append({"do": f"Upgrade {compat['with']} to {fc['needs']}+ (pinned {fc['pinned']})"})
+    if not target:
+        return steps + edit(f"set the version to a line {compat['with']} validates", **{"from": d.get("version")})
+    if dist.get("has_target"):
+        return steps + edit(f"set the version to {dist['latest']}", **{"from": d.get("version"), "to": dist["latest"]})
+    steps.append({"do": f"Pick a {target['line']} kernel from the options"})
+    return steps + edit(f"set the guest kernel to it", **{"from": d.get("version")})
+
+
+def compat_options(compat):
+    """The choices a person makes when no build on the compatible line comes from where the pin does."""
+    target = compat.get("target") or {}
+    dist = compat.get("distribution") or {}
+    if compat.get("ok") or not target or not dist or dist.get("has_target"):
+        return None
+    t, w = target["line"], compat["with"]
+    latest = target.get("latest") or t
+    options = [{"recommended": True, "url": compat.get("url"),
+                "text": f"{t}{' LTS' if target.get('lts') else ''} microVM kernel: Amazon Linux microvm-kernel-{t}, "
+                        f"or kernel.org {latest} with {w}'s guest config"}]
+    if dist.get("latest"):
+        options.append({"text": f"{dist['name']} kernel {dist['latest']}: patched, not validated by {w}"})
+    options.append({"text": "Keep it until the next base image, as an accepted exception"})
+    return options
 
 
 def product_name(lc):
@@ -311,8 +353,34 @@ def build(projects):
         if a not in out:
             out.append(a)
     out = [describe(a) for a in out if a["items"]]
+    link_prerequisites(out)
     out.sort(key=_sort_key)
     return out
+
+
+def link_prerequisites(actions):
+    """Point an action at the ones to make first: a guest kernel's move at its Firecracker upgrade.
+
+    The kernel's action already says so in its steps. This names the other
+    action, and tells that one what depends on it.
+    """
+    owner = {}
+    for a in actions:
+        for it in a["items"]:
+            if not it["reason"]:
+                owner.setdefault((id(it["project"]), it["dep"]["name"]), a)
+    for a in actions:
+        for it in a["items"]:
+            compat = it["dep"].get("compat") or {}
+            fc = compat.get("firecracker") or {}
+            other = owner.get((id(it["project"]), fc.get("name"))) if fc and not fc.get("ok") else None
+            if not other or other is a:
+                continue
+            if other["key"] not in a.setdefault("requires", []):
+                a["requires"].append(other["key"])
+            note = f"the {(compat.get('target') or {}).get('line')} guest kernel needs {fc['needs']}+"
+            if note not in other["evidence"]:
+                other["evidence"].append(note)
 
 
 def _sort_key(a):
@@ -400,6 +468,7 @@ def describe(a):
                                           else " ends ") + str(lc.get("eol") or "")[:10]
         compat = first.get("compat") or {}
         a["why"] = compat_text(compat) if compat and not compat.get("ok") else ""
+        a["options"] = compat_options(compat) if compat else None
     elif kind == "actions":
         a["title"] = f"Update {_plural(len(_uniq(it['dep']['name'] for it in items)), 'GitHub Action')} {where}"
         a["result"] = "One commit per project moves every uses: line"
@@ -538,8 +607,11 @@ def for_page(actions):
     out = []
     for a in actions:
         out.append({k: a[k] for k in ("id", "key", "kind", "tier", "level", "type", "status", "title", "result", "why", "released",
-                                      "how", "evidence", "projects", "opened", "ends", "sla", "exploited", "epss") if k in a}
+                                      "how", "evidence", "projects", "opened", "ends", "sla", "exploited", "epss", "options") if a.get(k) is not None}
                    | {"epss": round(a["epss"], 4),
+                      "requires": ["action-" + slug(k) for k in a.get("requires") or []] or None,
+                      # An action that depends on another or needs a choice shows every step, not one line.
+                      "steps": (a.get("steps") or a["items"][0]["steps"]) if a.get("options") or a.get("requires") else None,
                       "items": [{"project": it["project"]["name"], "record": it["index"], "reason": it["reason"],
                                  "tier": it["tier"], "to": it["to"]} for it in a["items"]]})
     return out
@@ -590,15 +662,18 @@ def agent_document(data, site, spec_url):
             if a.get("steps"):
                 steps = a["steps"] + [s for s in steps if s not in a["steps"] and "run" not in s]
             acts.append({k: v for k, v in {
-                "id": f"{p['name']}:{a['key'].split('|', 1)[0]}:{slug(a['key'].split('|', 1)[1] if '|' in a['key'] else a['key'])}",
+                "id": agent_id(p["name"], a["key"]),
                 "tier": a["tier"], "level": a["level"], "type": a["type"], "title": a["title"],
                 "result": a["result"], "why": a["why"] or None, "evidence": a["evidence"] or None,
                 "opened": a.get("opened"), "ends": a.get("ends"), "due": (a.get("sla") or {}).get("due"),
                 "exploited": a["exploited"] or None, "epss": round(a["epss"], 4) or None,
+                "requires": [agent_id(p["name"], k) for k in a.get("requires") or []] or None,
+                "options": a.get("options"),
                 "steps": steps or None, "changes": changes,
                 "page": f"{base}/deps?project={p['name']}#{a['id']}",
                 "decline": _decline(p, a),
             }.items() if v not in (None, [], {})})
+        acts = _prerequisites_first(acts)
         counts = {t: sum(1 for a in acts if a["tier"] == t) for t in TIERS}
         projects.append({"name": p["name"],
                          "repo": {"url": p["repo"]["url"], "clone": p["repo"]["url"] + ".git", "branch": p["repo"].get("branch"),
@@ -613,6 +688,8 @@ def agent_document(data, site, spec_url):
         "workflow": [
             "Work in a clone of the project, on a branch off the commit named in repo.sha or newer.",
             "Take actions in order: every fix action, then plan, then routine. One action is one commit.",
+            "An action's requires names the actions to make before it, and they come before it in this list.",
+            "An action with options needs a person's choice: propose the recommended one, and make none of them unasked.",
             "Follow each step: run a command in its cwd, make an edit at its file and line, or do the task it names.",
             "Run the project's own gate before committing, as its AGENTS.md or CONTRIBUTING.md describes.",
             "An action is done when every change meets its done_when. The next build of this file drops it.",
@@ -628,6 +705,29 @@ def agent_document(data, site, spec_url):
     }
 
 
+def agent_id(project, key):
+    kind, _, rest = key.partition("|")
+    return f"{project}:{kind}:{slug(rest or key)}"
+
+
+def _prerequisites_first(acts):
+    """Keep the order of urgency, except that an action follows every action it requires."""
+    by_id = {a["id"]: a for a in acts}
+    out, placed = [], set()
+
+    def place(a):
+        if a["id"] in placed:
+            return
+        placed.add(a["id"])
+        for r in a.get("requires") or []:
+            if r in by_id:
+                place(by_id[r])
+        out.append(a)
+    for a in acts:
+        place(a)
+    return out
+
+
 def _done_when(d, it):
     if it["reason"] in ("license", "unlisted"):
         return "the license policy grades it allowed, or the dependency is gone"
@@ -636,7 +736,10 @@ def _done_when(d, it):
     status = d.get("status")
     compat = d.get("compat") or {}
     if compat and not compat.get("ok"):
-        return f"the pin is on a line {compat.get('with')} supports: {', '.join(compat.get('supported') or []) or 'none yet'}"
+        target = compat.get("target") or {}
+        fc = compat.get("firecracker") or {}
+        return (f"on a line {compat['with']} validates" + (f" ({target['line']})" if target else "") +
+                (f", with {compat['with']} {fc['needs']}+" if fc and not fc.get("ok") else ""))
     if status == "vulnerable":
         return f"no advisory affects the pinned version" + (f": {d['fix']} or newer" if d.get("fix") else "")
     if status in ("eol", "eol-soon"):

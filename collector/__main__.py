@@ -139,8 +139,11 @@ def atom_feed(data, site, limit=100):
         first = seen.get("action|" + a["key"]) or data["generated"]
         lines = [x for x in (a.get("result"), a.get("why")) if x]
         lines += a.get("evidence") or []
+        titles = {x["id"]: x["title"] for x in data.get("actions") or []}
+        lines += ["First: " + titles.get(r, r) for r in a.get("requires") or []]
         if a.get("how"):
             lines.append("How: " + a["how"])
+        lines += [("Recommended: " if o.get("recommended") else "Or: ") + o["text"] for o in a.get("options") or []]
         lines.append("Projects: " + ", ".join(a["projects"]))
         entries.append((first, a, "\n".join(lines)))
     # Newest first, then in the page's order of urgency.
@@ -288,6 +291,7 @@ def main(argv=None):
     previous = read_previous(args.previous, client)
     known_packages, known_fedora = known_facts(previous)
     resolver.enrich_lifecycles(live)
+    resolver.link_compat(live)
     for label, step in (("package metadata", lambda ps: resolver.enrich_packages(ps, known_packages)),
                         ("repository signals", resolver.enrich_repos),
                         ("Fedora licenses", lambda ps: resolver.enrich_fedora_licenses(ps, known_fedora))):

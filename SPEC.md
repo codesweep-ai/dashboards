@@ -371,8 +371,18 @@ Each record in `dependencies` has this shape:
   "provider": "dashboards",          // internal: the project pinned
   "runner": { "image": "macOS 26 Arm64", "os": "macos", "version": "26", "arch": "arm64",
               "deprecated": false, "preview": false },   // a GitHub-hosted runner label, resolved
-  "compat": { "with": "Firecracker", "line": "6.19", "validated": ["5.10", "6.1", "6.18"],
-              "supported": ["6.18"], "ok": false, "url": "…" },  // a declared compatibility check
+  "compat": {                        // a declared compatibility check
+    "with": "Firecracker", "line": "6.19", "ok": false, "url": "…",
+    "validated": ["5.10", "6.1", "6.18"],                 // the guest lines its policy lists
+    "guaranteed": { "6.18": "2028-06-01" },              // each line's minimum end of support
+    "requires": { "6.18": "1.16.1" },                    // each line's first Firecracker release
+    "target": { "line": "6.18", "lts": true, "eol": "2028-12-31", "latest": "6.18.51",
+                "guaranteed": "2028-06-01", "min_firecracker": "1.16.1" },   // the line to move to
+    "newer": { "ended": ["6.19", "7.0", "7.1"], "not_validated": ["7.2"] },  // why not a newer line
+    "distribution": { "name": "Fedora 44", "latest": "7.2.4-200.fc44", "line": "7.2", "has_target": false },
+    "firecracker": { "name": "github.com/firecracker-microvm/firecracker", "pinned": "1.16.0",
+                     "needs": "1.16.1", "ok": false }  // the project's own Firecracker pin, against the target
+  },
   "source_package": "openssl",       // a Fedora package: the source package it builds from
   "note": "…",                       // something true that is not a verdict
   "purl": "pkg:npm/react@18.3.1",    // the package URL of the pinned release, where a purl type fits
@@ -643,7 +653,11 @@ an agent follow the same work. `deps.json` carries them twice: `actions` across 
   "projects": ["sandbox"],
   "opened": "…", "ends": "…", "sla": { /* the earliest */ },
   "exploited": false, "epss": 0.0091,
-  "items": [ { "project": "sandbox", "record": 3, "tier": "fix", "reason": null, "to": "6.18 line" } ]
+  "items": [ { "project": "sandbox", "record": 3, "tier": "fix", "reason": null, "to": "6.18 line" } ],
+  "requires": ["action-eol-firecracker-1-16"],   // actions to make first
+  "options": [ { "recommended": true, "text": "6.18 LTS microVM kernel: …", "url": "…" },
+               { "text": "Fedora 44 kernel 7.2.5-200.fc44: patched, not validated by Firecracker" } ],   // a choice for a person
+  "steps": [ /* every step, as the actions file lists them, when there are requires or options */ ]
 }
 ```
 
@@ -702,6 +716,8 @@ https://codesweep.ai/dashboards/deps-actions.json
       "title": "Upgrade vitest to 4.1.11 in tracer",
       "result": "Fixes 2 advisories", "why": "…", "evidence": ["…"],
       "opened": "…", "ends": "…", "due": "…", "exploited": true, "epss": 0.42,
+      "requires": ["sandbox:eol:firecracker-1-16"],   // actions to make first, listed before this one
+      "options": [ { "recommended": true, "text": "…", "url": "…" }, { "text": "…" } ],
       "steps": [
         { "run": "npm install -D vitest@4.1.11", "cwd": "apps/viewer" },
         { "edit": "internal/fcdisk/build.go", "line": 73, "text": "set the version to 1.17.0", "from": "1.16.0", "to": "1.17.0" },
@@ -736,6 +752,9 @@ https://codesweep.ai/dashboards/deps-actions.json
   knows both. `do` is a task no command makes, such as rebuilding an image.
 - **An edit is listed at every place the pin is written.** A command is listed once for every directory
   whose manifest declares the dependency.
+- **`requires` orders the work.** An action comes after every action it requires, in the file as in time.
+- **`options` is a choice for a person.** The collector recommends one and picks none. An agent proposes
+  the recommended option, and makes none of them unasked.
 - **An action's `id` is stable** for as long as the same change is called for: the project, the kind, and
   what groups its items. A commit or pull request can name it, and the next file shows whether it is gone.
 - **`done_when` says what the collector will see** once a change is made. An action is done when every
@@ -783,9 +802,18 @@ https://codesweep.ai/dashboards/deps-actions.json
 - **A pin is a version no extractor finds.** `match` is a regular expression whose first group is the
   version. `datasource` is `github`, `npm`, `goproxy`, `pypi`, `fedora-kernel`, `golang`, `node`,
   `python`, `temurin` or `maven`. `internal` marks a pin on the org's own package. `compat` names a
-  compatibility check, and `firecracker-guest` checks a guest kernel against Firecracker's supported lines.
-  An omitted `ecosystem` means `native`, and an omitted `scope` means
-  `build`.
+  compatibility check. An omitted `ecosystem` means `native`, and an omitted `scope` means `build`.
+- **`firecracker-guest` checks a guest kernel against Firecracker's kernel policy.** A kernel passes when
+  its line is one the policy's guest table lists. A listed line's date is a minimum end of support, so the
+  line stays validated past it. When the kernel fails, its `target` is the listed release guaranteed
+  longest that upstream still maintains: in practice, the newest long-term kernel. `newer` says
+  what became of every line released after it.
+- **The move names what it depends on.** The target line's first Firecracker release is compared with the
+  project's own Firecracker pin, and a pin too old makes upgrading it the first step. That upgrade's action
+  is named in the kernel's `requires`.
+- **A move says where its build comes from.** A Fedora kernel pin is compared with the only line its
+  release maintains, the line of its newest stable kernel. When that is the target line, the step is an
+  edit to that build. When it is not, the action carries `options` for a person to choose from.
 - **A pin that stops matching is reported.** It lands in the project's `unmatched` list and in a notice
   on the page, instead of dropping out unseen.
 - **A project can name a pin's upstream where the pin is.** The collector reads Renovate's annotation on
@@ -913,7 +941,7 @@ Where support dates come from.
 | xeol | It matches an SBOM or an image against endoflife.date's data. |
 | Docker Scout | It recommends a newer base image tag for an image it scans. |
 | Chainguard | Its images are rebuilt as upstream releases land, so freshness becomes the image publisher's job. |
-| **This dashboard** | It reads endoflife.date by product or package identifier, and the publisher's own policy where that has none: Firecracker, GitHub's runner images, nodejs.org and go.dev. A support end known only as a floor is shown as one. A guest kernel is checked against the lines Firecracker supports. |
+| **This dashboard** | It reads endoflife.date by product or package identifier, and the publisher's own policy where that has none: Firecracker, GitHub's runner images, nodejs.org and go.dev. A support end known only as a floor is shown as one. A guest kernel is checked against the lines Firecracker validates, and pointed at the newest long-term one. |
 
 ### Vulnerabilities
 

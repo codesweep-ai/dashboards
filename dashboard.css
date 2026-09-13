@@ -719,6 +719,7 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
 .dp-action__why { color: var(--muted); font-size: var(--font-size-caption); margin: var(--space-1) 0 var(--space-2); }
 .dp-action__evidence { color: var(--muted); font-size: var(--font-size-caption); margin-top: var(--space-2); }
 .dp-action__evidence .text-label-upper { margin-right: var(--space-1); }
+.dp-action__evidence a { color: var(--color-link); }
 .dp-action-rows {
   background: var(--card);
   border: 1px solid var(--border);
@@ -761,6 +762,13 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   padding: var(--space-2) var(--space-3);
 }
 .dp-how code { overflow-wrap: anywhere; white-space: pre-wrap; }
+/* Several steps, in order, read as a list rather than a line of code. */
+.dp-how--steps { display: block; }
+.dp-steps { font-size: var(--font-size-caption); margin: var(--space-1) 0 0; padding-left: var(--space-5); }
+.dp-steps li + li { margin-top: var(--space-1); }
+.dp-options { font-size: var(--font-size-caption); margin-top: var(--space-3); }
+.dp-options ul { display: grid; gap: var(--space-2); list-style: none; margin-top: var(--space-1); }
+.dp-options .ci-chip { vertical-align: baseline; }
 .dp-action .ci-card__foot a { color: var(--color-link); }
 
 /* --- project cards --- */
