@@ -123,6 +123,10 @@ writes it by running the collector, which clones each project's default branch o
 public sources about every dependency. It needs no API key. **Sources**, at the foot of the page, lists
 every source and what each gives, and [SPEC.md](SPEC.md#information-sources) describes each in full.
 
+The collector runs every day as well as on every push to this repository. Dependencies move without
+anyone committing: a registry publishes a release, a runtime reaches its end of life, an advisory lands.
+The page flags a file older than 36 hours.
+
 ### When a dependency is missing
 
 The collector finds dependencies in manifests, workflows and Containerfiles on its own. A version kept
