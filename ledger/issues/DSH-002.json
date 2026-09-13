@@ -3,22 +3,29 @@
   "title": "The dependencies page is not built",
   "type": "feature-idea",
   "severity": "med",
-  "status": "open",
+  "status": "closed",
   "foundBy": "session agent, while building this repository",
   "opened": "2026-09-10",
-  "resolved": null,
-  "stint": null,
+  "resolved": "2026-09-12",
+  "stint": "deps-page",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "7f94c94",
+      "5a088f7"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "make ci passed when the page was first built: 43 collector unit tests OK, and prose, refs, oss and ledger clean. A full collector run wrote 409 records, with 0 failures in 287 registry requests. The shape check in scripts/check-deps.py accepted the file. The page rendered all five views from it in headless Chromium with no console errors."
   },
-  "resolution": null,
+  "resolution": "The page is built, at /dashboards/deps, and the README links it. This site's Pages build writes the file it reads, on every push and daily, as the details anticipated. The collector clones each project over plain git and asks public registries, so no project changes and no API key is involved. It covers Go, npm, GitHub Actions, toolchains, images, Fedora packages, native pins and internal pins. SPEC.md describes the file and the rules that grade each dependency.",
   "details": "How far behind each project's dependencies are. No repository in the org carries a dependabot.yml, so this page would be the only signal. The history shows the bumps are done by hand. Unlike the CI page, this one reports a state rather than an event. Nothing publishes it on a build, so it needs a schedule of its own. index.html already lists it as a placeholder.",
   "notes": [
     {
       "date": "2026-09-10",
       "text": "index.html is deleted and the README is now the site's landing page, as in the sibling projects. There is no placeholder list any more, so this page announces itself by being linked from the README once it is built."
+    },
+    {
+      "date": "2026-09-12",
+      "text": "The first collection found work the page now queues. The sandbox guest kernel line 6.19 is past its end of life. Fedora security updates for curl and tar shipped after sandbox's base image was built. golang.org/x/mod v0.39.0 in lint, ledger and tracer carries two advisories fixed in 0.40.0."
     }
   ],
   "links": []

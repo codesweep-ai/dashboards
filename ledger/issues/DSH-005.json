@@ -1,0 +1,28 @@
+{
+  "id": "DSH-005",
+  "title": "The dependencies page lists everything but does not say what to do next",
+  "type": "improvement",
+  "severity": "med",
+  "status": "closed",
+  "foundBy": "user report (session): \"The dashboard is very rich but a bit overwhelming, not giving me a good view of what actions to take.\"",
+  "opened": "2026-09-12",
+  "resolved": "2026-09-13",
+  "stint": "deps-page",
+  "evidence": {
+    "commits": [
+      "7f94c94",
+      "5a088f7"
+    ],
+    "integrated": [],
+    "verified": "make ci passed at 5a088f7: 87 collector unit tests OK, the collector's run over this repository matched SPEC.md, and prose, refs, oss and ledger were clean. A full collector run wrote 3,484 records and 79 actions, with 0 failures in 530 requests. The shape check in scripts/check-deps.py accepted both JSON files. Validating the SBOM against the CycloneDX 1.6 schema reported 0 errors. Rendered from the collector's actions, the page matched the earlier page's actions on the same data, apart from intended wording. Every view rendered in both themes and at phone width in headless Chromium, with no console errors and no sideways scroll."
+  },
+  "resolution": "The projects view is the default. It leads with the next action, and each card links to the project's page, whose rows open onto their detail. Upgrades sorts every action into three tiers of urgency: fix now, plan and routine. The internal view is a card per project, like the projects view. The lifecycle view reads macOS, WSL and self-hosted runners. The inventory lists indirect dependencies, Fedora package versions and what a floating pin resolves to. The collector now decides the actions, so the page and the agent file deps-actions.json follow the same work.",
+  "details": "This is a review of the first version of the dependencies page. The upgrades view is one long list with no structure. The projects view is the useful one, but nothing on a card links to the detail behind it, and it is not the default. The internal view is a matrix and a table, unlike the projects view. The lifecycle view is missing the macOS runners in particular. It shows no `macos-latest`, no `macos-15-intel` from a matrix, and none of the self-hosted macOS ARM64 runners in campaign and sandbox. The inventory leaves out indirect dependencies, Fedora package versions, and what a floating pin resolves to.",
+  "notes": [
+    {
+      "date": "2026-09-12",
+      "text": "The page now leads with one next action and three tiers of urgency, and one word ladder runs through every chip. Cards carry evidence beside each verdict: Go reachability, license verdicts including Fedora packages, supply chain signals and gap age. The lifecycle view reads the macOS, WSL and self-hosted runners, and the inventory includes indirect records. Commits still to come, on the deps-page stint."
+    }
+  ],
+  "links": []
+}
