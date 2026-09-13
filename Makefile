@@ -8,6 +8,8 @@
 # by hand. `make repin` moves that pin.
 # The pages need Node for one thing only: the design tokens come out of the
 # @codesweep-ai/ui package rather than a copy in this repository.
+# The dependencies collector needs Python 3 and git and nothing installed: it is
+# the standard library, run as `python3 -m collector`.
 
 CS_LINT ?= go tool cs-lint
 PYTHON  ?= python3
@@ -16,15 +18,16 @@ NPM     ?= npm
 # The pages and the data the preview tree is assembled from. README.md is not
 # here: Jekyll renders it as the site's index in production, and the preview
 # server runs no Jekyll, so there is nothing to copy.
-SITE     := ci.html ci.js dashboard.css tokens.css projects.json
+SITE     := ci.html ci.js deps.html deps.js dashboard.css tokens.css projects.json
 PREVIEW  ?= _preview
 PORT     ?= 8732
 STATUS_TMP := $(shell mktemp -u -t ci-status.XXXXXX.json)
+DEPS_TMP   := $(shell mktemp -u -t deps.XXXXXX.json)
 # The projects whose status files the preview mirrors. Read from projects.json
 # so this list cannot drift from the one the page actually loads.
 PROJECTS := $(shell $(PYTHON) -c "import json;print(' '.join(p['name'] for p in json.load(open('projects.json'))['projects']))" 2>/dev/null)
 
-.PHONY: help deps tokens build test check ci lint actionlint prose refs oss data ledger preview status repin clean
+.PHONY: help deps tokens build test check ci lint actionlint prose refs oss data ledger preview status dependencies repin clean
 
 .DEFAULT_GOAL := help
 
@@ -73,6 +76,18 @@ status:
 	  echo "  $$p"; \
 	done
 
+## dependencies: write deps.json into the preview tree
+##
+## Runs the collector the site's build runs: it clones every project, asks
+## public registries about each dependency, and runs govulncheck over the Go
+## projects, which takes a few minutes. It needs Go and no token. With GH_TOKEN set it reads GitHub releases through the API, and
+## without one it reads github.com's release feeds, which list fewer releases.
+dependencies:
+	@mkdir -p $(PREVIEW)/dashboards
+	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --output $(PREVIEW)/dashboards/deps.json \
+	  --feed $(PREVIEW)/dashboards/deps-feed.xml --sbom $(PREVIEW)/dashboards/deps.cdx.json \
+	  --actions $(PREVIEW)/dashboards/deps-actions.json
+
 ## preview: serve the preview tree at http://localhost:$(PORT)/dashboards/
 ##
 ## Says so when the tree holds no status files. Every card would read "no
@@ -85,6 +100,8 @@ preview: build
 	else \
 	  echo "preview: $$n of $(words $(PROJECTS)) projects have a status file"; \
 	fi
+	@test -s $(PREVIEW)/dashboards/deps.json || \
+	  echo "preview: no deps.json yet, so the dependencies page has nothing to show. Run 'make dependencies'."
 	@echo "preview: http://localhost:$(PORT)/dashboards/ci.html (ctrl-c to stop)"
 	@cd $(PREVIEW) && $(PYTHON) -m http.server $(PORT)
 
@@ -92,13 +109,18 @@ preview: build
 data:
 	@$(PYTHON) scripts/check-projects.py projects.json
 
-## test: check the action compiles and still writes what SPEC.md describes
+## test: check the action and the collector still write what SPEC.md describes
 ##
-## The end-to-end run needs a token, so without one it reports a skip rather
-## than a pass: a run that checked nothing must never read as a run that
-## checked everything.
+## The action's end-to-end run needs a token, so without one it reports a skip
+## rather than a pass: a run that checked nothing must never read as a run that
+## checked everything. The collector's needs none, so it always runs, over this
+## repository alone to keep it quick.
 test:
 	@$(PYTHON) -m py_compile action/ci-status && echo "test: action/ci-status compiles"
+	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s tests -t . -q
+	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --only dashboards --no-reachability --output $(DEPS_TMP) \
+	  >/dev/null 2>$(DEPS_TMP).log || { cat $(DEPS_TMP).log >&2; exit 1; }
+	@$(PYTHON) scripts/check-deps.py $(DEPS_TMP)
 	@if [ -n "$$GH_TOKEN$$GITHUB_TOKEN" ]; then \
 	  CI_STATUS_OUTPUT=$(STATUS_TMP) ./action/ci-status codesweep-ai/dashboards >/dev/null && \
 	  $(PYTHON) scripts/check-status.py $(STATUS_TMP); \
@@ -147,6 +169,7 @@ repin:
 	go get -tool github.com/codesweep-ai/lint/cmd/cs-lint@latest
 	go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@latest
 	go get -tool github.com/rhysd/actionlint/cmd/actionlint@latest
+	go get -tool golang.org/x/vuln/cmd/govulncheck@latest
 	go mod tidy
 
 ## check: the gate a contributor runs before pushing
@@ -163,7 +186,7 @@ check: data test prose refs oss
 ci: check actionlint ledger
 	@printf '\nci: every gate ran. Not reproduced here: looking at the pages.\n'
 
-## clean: remove the local preview tree and the copied tokens
+## clean: remove the local preview tree, the copied tokens and the collector's local files
 clean:
-	rm -rf $(PREVIEW) tokens.css
-	@echo "clean: $(PREVIEW) and tokens.css removed"
+	rm -rf $(PREVIEW) tokens.css deps.json deps-actions.json deps-feed.xml deps.cdx.json
+	@echo "clean: $(PREVIEW), tokens.css and the collector's local files removed"

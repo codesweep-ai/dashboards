@@ -13,6 +13,13 @@
 # Python's bytecode cache, left behind by running or compiling the action.
 __pycache__/
 
+# What `python3 -m collector` writes when run from the root. The site's build
+# writes it into the deployment instead, so the history never carries one.
+/deps.json
+/deps-actions.json
+/deps-feed.xml
+/deps.cdx.json
+
 # The design tokens, copied out of @codesweep-ai/ui by `npm run tokens`. The
 # package is the source; a copy in the history is a fork of it waiting to drift.
 /tokens.css

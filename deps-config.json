@@ -1,0 +1,145 @@
+{
+ "schema": 1,
+ "comment": "What the dependencies collector cannot read from a manifest, and the policies it grades against. `include` names repositories read besides the projects in projects.json. A pin is a version written somewhere no extractor looks, with the upstream it tracks. A snapshot says when a project's floating packages were last resolved. `licenses` grades the licenses of code a project ships: an exact entry wins over a wildcard. `accepted` records findings left be on purpose, each with a reason and an expiry. An optional `sla` sets fix-by days per level; without it the page shows how long each gap has been open. SPEC.md describes every field.",
+ "org": "codesweep-ai",
+ "site": "https://codesweep.ai/dashboards/",
+ "include": ["dashboards"],
+ "pins": [
+  {
+   "project": "sandbox",
+   "path": "internal/fcdisk/build.go",
+   "match": "DefaultFCVersion = \"v?([^\"]+)\"",
+   "name": "github.com/firecracker-microvm/firecracker",
+   "label": "Firecracker",
+   "datasource": "github",
+   "package": "firecracker-microvm/firecracker",
+   "tag_prefix": "v"
+  },
+  {
+   "project": "sandbox",
+   "path": "internal/fcdisk/build.go",
+   "match": "DefaultKVerPin = \"([^\"]+)\"",
+   "name": "kernel",
+   "label": "Linux kernel (Fedora guest)",
+   "datasource": "fedora-kernel",
+   "compat": "firecracker-guest"
+  },
+  {
+   "project": "sandbox",
+   "path": "image/Containerfile.agents",
+   "match": "^ARG CLAUDE_CODE_VERSION=(\\S+)",
+   "name": "@anthropic-ai/claude-code",
+   "label": "Claude Code",
+   "datasource": "npm",
+   "package": "@anthropic-ai/claude-code"
+  },
+  {
+   "project": "sandbox",
+   "path": "image/Containerfile.base",
+   "match": "PYENV_GIT_TAG=(v[\\d.]+)",
+   "name": "github.com/pyenv/pyenv",
+   "label": "pyenv",
+   "datasource": "github",
+   "package": "pyenv/pyenv"
+  },
+  {
+   "project": "ledger",
+   "path": "internal/ledger/render.go",
+   "match": "const UIVersion = \"([^\"]+)\"",
+   "ecosystem": "npm",
+   "scope": "direct",
+   "internal": true,
+   "name": "@codesweep-ai/ui",
+   "datasource": "npm",
+   "package": "@codesweep-ai/ui"
+  },
+  {
+   "project": "campaign",
+   "path": "dispatch-viewer/fixtures/vendor/axe-core/axe.min.js",
+   "match": "axe\\.version=\"([^\"]+)\"",
+   "ecosystem": "npm",
+   "scope": "dev",
+   "name": "axe-core",
+   "label": "axe-core (vendored for tests)",
+   "datasource": "npm",
+   "package": "axe-core"
+  },
+  {
+   "project": "ledger",
+   "path": "viewer/fixtures/vendor/axe-core/axe.min.js",
+   "match": "axe\\.version=\"([^\"]+)\"",
+   "ecosystem": "npm",
+   "scope": "dev",
+   "name": "axe-core",
+   "label": "axe-core (vendored for tests)",
+   "datasource": "npm",
+   "package": "axe-core"
+  }
+ ],
+ "snapshots": [
+  {
+   "project": "sandbox",
+   "packages": "image/Containerfile.base",
+   "built": {
+    "path": "image/tiers.env",
+    "match": "^AGENTS_REF=\\S+:v0\\.0\\.0-(\\d{14})-"
+   }
+  }
+ ],
+ "licenses": {
+  "allow": [
+   "MIT",
+   "MIT-0",
+   "Apache-2.0",
+   "BSD-2-Clause",
+   "BSD-3-Clause",
+   "BSD-3-Clause-Clear",
+   "ISC",
+   "0BSD",
+   "Unlicense",
+   "CC0-1.0",
+   "CC-BY-4.0",
+   "BlueOak-1.0.0",
+   "Python-2.0",
+   "PSF-2.0",
+   "Zlib",
+   "X11",
+   "curl",
+   "Unicode-3.0",
+   "Unicode-DFS-2016",
+   "BSL-1.0",
+   "WTFPL",
+   "OFL-1.1",
+   "Apache-2.0 WITH LLVM-exception"
+  ],
+  "review": [
+   "MPL-*",
+   "LGPL-*",
+   "EPL-*",
+   "CDDL-*",
+   "CC-BY-SA-*",
+   "LicenseRef-*",
+   "Artistic-*"
+  ],
+  "deny": [
+   "GPL-*",
+   "AGPL-*",
+   "SSPL-*",
+   "BUSL-*",
+   "Commons-Clause",
+   "CC-BY-NC-*",
+   "Elastic-*"
+  ],
+  "deny_aggregate": [
+   "LicenseRef-Callaway-*",
+   "LicenseRef-Proprietary*"
+  ],
+  "aggregate": [
+   "package",
+   "image",
+   "native",
+   "runtime"
+  ]
+ },
+ "accepted": []
+}

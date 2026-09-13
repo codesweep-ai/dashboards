@@ -25,8 +25,10 @@ docs:
     # English here, and the check would fire on every ordinary use.
     glossary:
       - status file
+      - dependencies file
       - design token
       - same-origin
+      - libyear
 
     lowercaseStarters: []
 
@@ -60,10 +62,11 @@ oss:
     - CONTRIBUTING.md
     - AGENTS.md
 
-  # Only what the built-in list does not already carry. These four are this
-  # project's own vocabulary: the preview tree it assembles, the status files it
-  # fetches into it, the server it runs over it, and moving the linter pin.
-  expectedTargets: ["build", "status", "preview", "repin"]
+  # Only what the built-in list does not already carry. These are this
+  # project's own vocabulary: the preview tree it assembles, the status files and
+  # the dependencies file it writes into it, the server it runs over it, and
+  # moving the linter pin.
+  expectedTargets: ["build", "status", "dependencies", "preview", "repin"]
 
   # Every waiver takes the reason it is waived, and that reason is printed with
   # the finding. A waiver nobody can review is a rule deleted in private.

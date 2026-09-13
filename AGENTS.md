@@ -19,5 +19,6 @@ Two rules that catch people out, both spelled out where they belong:
   `tokens.css`, which `npm run tokens` copies out of the `@codesweep-ai/ui`
   dependency. It is generated, so never edit it. CONTRIBUTING.md says how to
   take an update.
-- **A page may not call the GitHub API.** It reads static JSON that projects
-  publish. SPEC.md says why, and what breaks if you do.
+- **A page may not call the GitHub API.** It reads static JSON: the status files
+  projects publish, and the dependencies file this site's build writes. SPEC.md
+  says why, and what breaks if you do.
