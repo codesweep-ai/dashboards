@@ -1,0 +1,20 @@
+{
+  "id": "DSH-006",
+  "title": "The CI page dates a project by when its status file was written, which a scheduled rebuild keeps fresh",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "user report (session): \"Since we have the run dates in the projects cards, can't we detect 72-hour staleness that way in the dashboard?\"",
+  "opened": "2026-09-15",
+  "resolved": null,
+  "stint": "2026-09-15 CI status reported as running",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "`ci.js` flags a card as stale when the file's `generated` time is more than 72 hours old. That measured how long ago the project built only while a status was written after ci alone.\n\nledger, lint, sandbox and ui now also rebuild their Pages site after prune-images, which runs every day. Their files are therefore never more than a day old, so the flag can no longer fire for them, even when nothing has been pushed for weeks.\n\nThe file already carries the date that matters. The latest run of the `ci` workflow moves only when the project builds, and it stops moving when the file stops being published.",
+  "notes": [],
+  "links": []
+}
