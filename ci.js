@@ -1,12 +1,12 @@
 /* Assemble the dashboard in the browser.
  *
  * projects.json lists where each project publishes its own ci-status.json. Those
- * paths are relative, so they resolve on whichever host serves this page: a fork
- * reads its owner's projects, and the page names no owner of its own. Being
- * same-origin, this needs no CORS, no API token and none of the GitHub API's
- * 60-requests-an-hour anonymous budget. Each file is
- * written by that project's own CI, so it is fresh as of that project's last
- * build — which is why staleness is shown per card rather than once for the page.
+ * paths are relative, so they resolve on whichever host serves this page, and a
+ * fork reads its own owner's projects. Being same-origin, this needs no CORS, no
+ * API token and none of the GitHub API's 60-requests-an-hour anonymous budget.
+ * Each file is written by that project's own CI, so it is fresh as of that
+ * project's last build — which is why staleness is shown per card rather than
+ * once for the page.
  */
 (function () {
   "use strict";
@@ -245,26 +245,6 @@
       "<td>" + (w.last_failure ? esc(fmtAgo(w.last_failure.started)) : "—") + "</td></tr>";
   }
 
-  // Whose projects these are, read off the files that loaded. A fork's page then
-  // names the fork's owner, because that owner's projects wrote the files.
-  function owners(projects) {
-    var seen = [];
-    projects.forEach(function (p) {
-      var owner = p.unreachable ? "" : String(p.repo.full_name || "").split("/")[0];
-      if (owner && !has(seen, owner)) seen.push(owner);
-    });
-    return seen;
-  }
-
-  function nameOwner(projects, title) {
-    var who = owners(projects).join(", ");
-    if (!who) return;
-    var el = document.getElementById("owner");
-    el.textContent = who + " / ";
-    el.hidden = false;
-    if (!title) document.title = "CI · " + who;
-  }
-
   function render(projects) {
     projects.sort(function (a, b) {
       return (ORDER[a.state] - ORDER[b.state]) ||
@@ -448,23 +428,18 @@
 
   theme();
   var base = new URL(INDEX, location.href).href;
-  var title = "";
   fetch(INDEX, { cache: "no-cache" })
     .then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     })
     .then(function (index) {
-      title = index.title || "";
-      if (title) document.title = "CI · " + title;
+      if (index.title) document.title = "CI · " + index.title;
       var list = index.projects || [];
       if (!list.length) throw new Error("projects.json lists no projects");
       return Promise.all(list.map(function (e) { return loadProject(e, base); }));
     })
-    .then(function (projects) {
-      nameOwner(projects, title);
-      render(projects.map(summarise));
-    })
+    .then(function (projects) { render(projects.map(summarise)); })
     .catch(function (err) {
       document.getElementById("loading").innerHTML =
         "Could not load <code>" + esc(INDEX) + "</code>: " + esc(err.message || err);

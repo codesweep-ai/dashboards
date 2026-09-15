@@ -124,7 +124,7 @@ for.
 ```jsonc
 {
   "schema": 1,
-  "title": "…",                       // optional, the document title; the owner otherwise
+  "title": "codesweep-ai CI",         // optional, used in the document title
   "projects": [
     { "name": "lint", "status": "../lint/ci-status.json" }
   ]
@@ -1081,9 +1081,8 @@ How the work is shown.
 - **Every status file is same-origin.** Each project's Pages site is a path on the
   host that serves the page, so a page fetches them with no CORS, no token and no
   API quota. That host is `codesweep.ai` for codesweep-ai, and `<owner>.github.io`
-  for a fork, whose page therefore reads the fork's own projects.
-- **A page names no owner of its own.** It takes the owner from `repo.full_name`
-  in the files it loads, so a fork's page names the fork's owner.
+  for a fork, whose page therefore reads the fork's own projects. The page keeps
+  the codesweep-ai name either way: only where it reads from follows the fork.
 - **A page must not call the GitHub API.** Anonymous browser calls are capped at
   60 an hour per IP. Conditional requests do not help, because GitHub exempts a
   `304` from the limit only *"if the request was made while correctly authorized

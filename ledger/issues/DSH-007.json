@@ -15,6 +15,11 @@
   },
   "resolution": null,
   "details": "The CI page itself already reads a fork's own data. Every path in `projects.json` is relative, so a fork served at `<owner>.github.io/dashboards/` fetches `<owner>.github.io/<project>/ci-status.json`, which that owner's fork of the project publishes.\n\nThree things still name codesweep-ai. `projects.json` sets the title to `codesweep-ai CI`, and `ci.html` carries the same name, so a fork's tab says it is codesweep-ai's. `make status` and `make test` read `codesweep-ai/<project>` from the API, so a fork's preview shows the upstream runs rather than its own. SPEC.md places every status file under `codesweep.ai`, which is true of one deployment only.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-15",
+      "text": "The codesweep-ai name is not part of the defect. The repository owner wants every page to keep it in a fork, so the title in `projects.json` and `ci.html` stays. Only where a page reads its data from has to follow the fork."
+    }
+  ],
   "links": []
 }

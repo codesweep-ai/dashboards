@@ -1,6 +1,7 @@
 {
  "schema": 1,
- "comment": "Each project publishes its own ci-status.json to its Pages site. These URLs are relative to this file, so they resolve on whichever host serves the page, and a fork reads its own owner's projects. Being same-origin, they need no CORS, no API rate limit and no token. The page names the owner from the files it loads, so no title is set here. Adding a project here is the only change the dashboard needs.",
+ "title": "codesweep-ai CI",
+ "comment": "Each project publishes its own ci-status.json to its Pages site. These URLs are relative to this file, so they resolve on whichever host serves the page, and a fork reads its own owner's projects. Being same-origin, they need no CORS, no API rate limit and no token. Adding a project here is the only change the dashboard needs.",
  "projects": [
   { "name": "campaign", "status": "../campaign/ci-status.json" },
   { "name": "ledger",   "status": "../ledger/ci-status.json" },

@@ -44,7 +44,7 @@ branch: `@main` would mean that project's build runs whatever this repository ho
 The page works unchanged in a fork, and shows the fork's own projects. Its paths are relative, so it
 reads the status files on the host that serves it. A fork owned by `alice` serves the page at
 `alice.github.io/dashboards/ci`, which reads `alice.github.io/lint/ci-status.json` and the rest. The
-page names the owner it finds in those files.
+page still carries the codesweep-ai name, since only the data follows the fork.
 
 A project appears once its fork publishes a status:
 
