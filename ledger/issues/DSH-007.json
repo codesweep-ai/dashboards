@@ -1,0 +1,20 @@
+{
+  "id": "DSH-007",
+  "title": "A fork of this repository shows codesweep-ai's name, and previews codesweep-ai's runs",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "user report (session): \"On the dashboard, make sure that it can work in a fork as well, and give an accurate dashboard view of the status of the fork, without hardcoding references to the codesweep-ai org.\"",
+  "opened": "2026-09-15",
+  "resolved": null,
+  "stint": "2026-09-15 CI status reported as running",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "The CI page itself already reads a fork's own data. Every path in `projects.json` is relative, so a fork served at `<owner>.github.io/dashboards/` fetches `<owner>.github.io/<project>/ci-status.json`, which that owner's fork of the project publishes.\n\nThree things still name codesweep-ai. `projects.json` sets the title to `codesweep-ai CI`, and `ci.html` carries the same name, so a fork's tab says it is codesweep-ai's. `make status` and `make test` read `codesweep-ai/<project>` from the API, so a fork's preview shows the upstream runs rather than its own. SPEC.md places every status file under `codesweep.ai`, which is true of one deployment only.",
+  "notes": [],
+  "links": []
+}
