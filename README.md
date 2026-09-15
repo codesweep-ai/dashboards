@@ -48,11 +48,10 @@ Because each project publishes independently, the page is explicit about what it
 
 - **No file yet.** It is shown as a dashed "no status" card and named in a notice. It does not break
   the page or count against the green tally.
-- **A file older than 72 hours.** The card footer is flagged and the project is named in a notice.
+- **No ci run in 72 hours.** The card footer is flagged and the project is named in a notice.
   Green from three weeks ago is not the same claim as green now, and the page says which it is.
-  A status is as old as the project's last Pages build. A project whose Pages workflow also runs
-  after a scheduled workflow republishes on that schedule, so its file never reaches 72 hours. The
-  run dates on its card are then what show that it has stopped building.
+  The age comes from the project's latest `ci` run, not from when its file was written. A project
+  that rebuilds its site on a schedule is therefore still flagged once it stops building.
 
 ## The dependencies page
 

@@ -1086,10 +1086,14 @@ How the work is shown.
   with an `Authorization` header"*. Authorising would mean putting a token in a
   public page, which is publishing it. Read the static files instead.
 - **A project may be missing or stale, and that is data.** A file may 404 because
-  the project has not published yet; it may be old because the project has not
-  built. Both are facts worth showing, and neither may break the page or be
-  counted as a failure. Nothing refreshes a status on a schedule, so its age is
-  honest: a cron would update the timestamp without updating the facts.
+  the project has not published yet, and a project may not have built for days.
+  Both are facts worth showing, and neither may break the page or be counted as
+  a failure.
+- **A project is dated by its latest `ci` run.** A project may rebuild its Pages
+  site on a schedule, which rewrites `generated` with nothing built, so a page
+  reads the date off the workflow named `ci` instead. A file that stops being
+  published freezes that date too. A page falls back to `generated` only when
+  there is no `ci` run to read.
 - **The dependencies file is same-origin as well**, because it is published with
   the page that reads it.
 - **The dependencies file may be old, and that is data too.** The build writes

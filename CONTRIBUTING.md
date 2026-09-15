@@ -60,8 +60,8 @@ cache headers.
 it.
 
 Check the degraded paths too, because production will hit them first. Point an
-entry in `projects.json` at a file that does not exist, and back-date a
-`generated` timestamp by a week. A missing project must render as a
+entry in `projects.json` at a file that does not exist, and back-date the
+`started` of a project's latest `ci` run by a week. A missing project must render as a
 card and a notice rather than an error, and a stale one must say how old it is.
 On the dependencies page, back-date `generated` in `deps.json`, and give a
 source some `failures`. Both must raise a notice.

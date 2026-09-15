@@ -13,8 +13,12 @@
   // A workflow passing right now but below this rate across the window is flaky —
   // the state a green tip would otherwise hide.
   var FLAKY_BELOW = 85;
-  // Past this, a project's own status file is old enough to say so out loud.
+  // Past this since its latest ci run, a project has been quiet long enough to say
+  // so out loud. The run dates the project rather than the file does, because a
+  // Pages build may also follow a scheduled workflow and rewrite the file daily
+  // with nothing built. A file that stops being published freezes the run too.
   var STALE_AFTER_H = 72;
+  var PRIMARY_GATE = "ci";
 
   var PASSED = ["success"];
   var FAILED = ["failure", "timed_out", "startup_failure"];
@@ -110,6 +114,16 @@
 
   // --- roll-up ------------------------------------------------------------
 
+  // When the project last built: its latest ci run, or the file itself for a
+  // project with no ci run to read.
+  function lastBuilt(p) {
+    var gate = p.workflows.filter(function (w) {
+      return w.name.toLowerCase() === PRIMARY_GATE && w.latest && w.latest.started;
+    })[0];
+    return gate ? { at: gate.latest.started, label: "last ci run" }
+      : { at: p.generated, label: "status published" };
+  }
+
   function summarise(p) {
     var buckets = [], rates = [];
     p.workflows.forEach(function (w) {
@@ -121,7 +135,8 @@
     p.flaky = p.workflows.filter(function (w) {
       return w.pass_rate != null && w.pass_rate < FLAKY_BELOW;
     });
-    p.staleHours = hoursSince(p.generated);
+    p.built = lastBuilt(p);
+    p.staleHours = hoursSince(p.built.at);
     p.state = p.unreachable ? "unreachable"
       : has(buckets, "critical") ? "critical"
       : has(buckets, "running") ? "running"
@@ -206,8 +221,9 @@
       '<p class="ci-card__desc">' + esc(p.repo.description) + "</p>" +
       '<div class="ci-card__body">' + rows.join("") + "</div>" +
       '<footer class="ci-card__foot' + (stale ? " ci-card__foot--stale" : "") +
-      '">branch <code>' + esc(p.repo.branch) + "</code> · status published " +
-      esc(fmtAgo(p.generated)) + "</footer></article>";
+      '">branch <code>' + esc(p.repo.branch) + "</code> · " +
+      (p.built.at === p.generated ? "" : esc(p.built.label + " " + fmtAgo(p.built.at)) + " · ") +
+      "status published " + esc(fmtAgo(p.generated)) + "</footer></article>";
   }
 
   function tableRow(p, w) {
@@ -282,10 +298,10 @@
       return p.staleHours != null && p.staleHours > STALE_AFTER_H;
     });
     if (staleProjects.length) {
-      notices += '<p class="ci-note">' + ICON.idle + "<span>Status older than " +
+      notices += '<p class="ci-note">' + ICON.idle + "<span>Nothing built in " +
         STALE_AFTER_H + "h — these projects have not built recently: " +
         staleProjects.map(function (p) {
-          return "<b>" + esc(p.name) + "</b> (" + esc(fmtAgo(p.generated)) + ")";
+          return "<b>" + esc(p.name) + "</b> (" + esc(p.built.label + " " + fmtAgo(p.built.at)) + ")";
         }).join(", ") + ".</span></p>";
     }
     document.getElementById("notices").innerHTML = notices;
