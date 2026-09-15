@@ -3,17 +3,19 @@
   "title": "The CI page dates a project by when its status file was written, which a scheduled rebuild keeps fresh",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "user report (session): \"Since we have the run dates in the projects cards, can't we detect 72-hour staleness that way in the dashboard?\"",
   "opened": "2026-09-15",
-  "resolved": null,
+  "resolved": "2026-09-15",
   "stint": "2026-09-15 CI status reported as running",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "dc53072"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "The page was rendered in headless Chromium over the published status files, with lint's latest ci run back-dated a week and its file an hour old. The card for lint was flagged as `last ci run 7d ago · status published 1h ago`, and the notice named it. A copy of vcr with no ci workflow fell back to its file's date and was flagged too.\n\nOnce dc53072 was deployed, the live page flagged tracer as `last ci run 5d ago` and no other project. `make ci` passed at a33e346."
   },
-  "resolution": null,
+  "resolution": "`ci.js` dates a project by its latest ci run, and falls back to `generated` only when there is no ci run. A project that rebuilds its site on a schedule is still flagged once it stops building.",
   "details": "`ci.js` flags a card as stale when the file's `generated` time is more than 72 hours old. That measured how long ago the project built only while a status was written after ci alone.\n\nledger, lint, sandbox and ui now also rebuild their Pages site after prune-images, which runs every day. Their files are therefore never more than a day old, so the flag can no longer fire for them, even when nothing has been pushed for weeks.\n\nThe file already carries the date that matters. The latest run of the `ci` workflow moves only when the project builds, and it stops moving when the file stops being published.",
   "notes": [],
   "links": []

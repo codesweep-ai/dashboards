@@ -3,17 +3,21 @@
   "title": "A fork of this repository shows codesweep-ai's name, and previews codesweep-ai's runs",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "user report (session): \"On the dashboard, make sure that it can work in a fork as well, and give an accurate dashboard view of the status of the fork, without hardcoding references to the codesweep-ai org.\"",
   "opened": "2026-09-15",
-  "resolved": null,
+  "resolved": "2026-09-15",
   "stint": "2026-09-15 CI status reported as running",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "de1cf46",
+      "8a83235",
+      "a33e346"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at a33e346, with 95 unit tests where there were 89. Reverting each of five fixes in a scratch copy failed the new test written for it.\n\nThe collector ran over one account's forks of ledger, lint and ui, with `--owner` naming that account. It read each fork at its own head. It found the same internal dependencies as a run over codesweep-ai: 3, 2 and 11. Its compare links and its decline target named that account. The dependencies page rendered that file in headless Chromium, with every repository link on that account and the codesweep-ai title.\n\nThe live build at a33e346 read its previous file from https://codesweep.ai/dashboards/deps.json and carries three days of history. The Makefile derives OWNER=alice when GITHUB_REPOSITORY is alice/dashboards. No fork has Pages enabled, so a deployed fork was not tried."
   },
-  "resolution": null,
+  "resolution": "The collector takes `--owner` and `--site` apart from `org`, so a fork's build reads its own owner's repositories and its own history. The codesweep-ai modules, packages and images still count as siblings. `make status` and `make test` read the checkout's own owner. Every page keeps the codesweep-ai name.",
   "details": "The CI page itself already reads a fork's own data. Every path in `projects.json` is relative, so a fork served at `<owner>.github.io/dashboards/` fetches `<owner>.github.io/<project>/ci-status.json`, which that owner's fork of the project publishes.\n\nThree things still name codesweep-ai. `projects.json` sets the title to `codesweep-ai CI`, and `ci.html` carries the same name, so a fork's tab says it is codesweep-ai's. `make status` and `make test` read `codesweep-ai/<project>` from the API, so a fork's preview shows the upstream runs rather than its own. SPEC.md places every status file under `codesweep.ai`, which is true of one deployment only.",
   "notes": [
     {
