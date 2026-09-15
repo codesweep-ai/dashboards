@@ -629,9 +629,14 @@ def annotate_records(projects):
 REASON_WORDS = {"license": "license", "unlisted": "license", "abandoned": "abandoned"}
 
 
-def agent_document(data, site, spec_url):
-    """The actions file: every project's actions, with the changes, steps and checks an agent needs."""
+def agent_document(data, site, spec_url, repository=None):
+    """The actions file: every project's actions, with the changes, steps and checks an agent needs.
+
+    `repository` is the one holding deps-config.json, where a decline is proposed:
+    this repository, or a fork's copy of it.
+    """
     base = (site or "").rstrip("/")
+    repository = repository or f"{data.get('owner') or data['org']}/dashboards"
     projects = []
     for p in data["projects"]:
         if p.get("error"):
@@ -671,7 +676,7 @@ def agent_document(data, site, spec_url):
                 "options": a.get("options"),
                 "steps": steps or None, "changes": changes,
                 "page": f"{base}/deps?project={p['name']}#{a['id']}",
-                "decline": _decline(p, a),
+                "decline": _decline(p, a, repository),
             }.items() if v not in (None, [], {})})
         acts = _prerequisites_first(acts)
         counts = {t: sum(1 for a in acts if a["tier"] == t) for t in TIERS}
@@ -683,6 +688,7 @@ def agent_document(data, site, spec_url):
         "schema": 1,
         "generated": data["generated"],
         "org": data["org"],
+        "owner": data.get("owner") or data["org"],
         "about": ("What to change in each project's dependencies, most urgent first. Each action is one change: "
                   "its steps make it, its changes say what moves where, and each change says when it is done."),
         "workflow": [
@@ -693,7 +699,7 @@ def agent_document(data, site, spec_url):
             "Follow each step: run a command in its cwd, make an edit at its file and line, or do the task it names.",
             "Run the project's own gate before committing, as its AGENTS.md or CONTRIBUTING.md describes.",
             "An action is done when every change meets its done_when. The next build of this file drops it.",
-            "When a change cannot be made, say why, and propose the decline entry for deps-config.json in codesweep-ai/dashboards.",
+            f"When a change cannot be made, say why, and propose the decline entry for deps-config.json in {repository}.",
         ],
         "tiers": {"fix": "act now: a vulnerability, an end of life, or a fix-by date already passed",
                   "plan": "schedule: a major behind, a denied license, an abandoned package, an advisory no code calls",
@@ -755,7 +761,7 @@ def _done_when(d, it):
     return "the next build no longer lists this change"
 
 
-def _decline(p, a):
+def _decline(p, a, repository):
     first = a["items"][0]
     d = first["dep"]
     finding = "license" if first["reason"] in ("license", "unlisted") else \
@@ -764,5 +770,5 @@ def _decline(p, a):
              "reason": "tolerable_risk", "note": "why this is left as it is", "until": "YYYY-MM-DD"}
     if d.get("version"):
         entry["version"] = d["version"]
-    return {"file": "deps-config.json", "repo": "codesweep-ai/dashboards", "accepted": entry,
+    return {"file": "deps-config.json", "repo": repository, "accepted": entry,
             "reasons": ["fix_started", "inaccurate", "no_bandwidth", "not_used", "tolerable_risk"]}

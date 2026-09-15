@@ -143,6 +143,10 @@ writes it by running the collector, which clones each project's default branch o
 public sources about every dependency. It needs no API key. **Sources**, at the foot of the page, lists
 every source and what each gives, and [SPEC.md](SPEC.md#information-sources) describes each in full.
 
+In a fork, the build clones the fork owner's repositories and reads the history its own site published,
+so the page shows the fork's projects. The codesweep-ai modules, packages and images still count as
+siblings, because a fork keeps their names. The page keeps the codesweep-ai name too.
+
 The collector runs every day as well as on every push to this repository. Dependencies move without
 anyone committing: a registry publishes a release, a runtime reaches its end of life, an advisory lands.
 The page flags a file older than 36 hours.

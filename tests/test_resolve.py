@@ -23,10 +23,11 @@ class FakeSources:
 
 
 class FakeRepo:
-    def __init__(self, behind, touching=None, committed=NOW, pinned_at=datetime(2026, 9, 1, tzinfo=timezone.utc)):
+    def __init__(self, behind, touching=None, committed=NOW, pinned_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+                 url="https://github.com/codesweep-ai/ledger"):
         self._behind, self._touching = behind, touching
         self.committed, self._pinned_at = committed, pinned_at
-        self.sha, self.branch = "d687ad5b27750000", "main"
+        self.sha, self.branch, self.url = "d687ad5b27750000", "main", url
 
     def behind(self, ref, paths=()):
         return self._touching if paths else self._behind
@@ -133,6 +134,23 @@ class Resolve(unittest.TestCase):
                                               scope="tool", datasource="goproxy"))
         self.assertEqual((d["provider"], d["lag"]["commits"], d["lag"]["pinned"]), ("ledger", 8, "bda511aea589"))
         self.assertGreater(d["lag"]["days"], 10)
+
+    def test_a_fork_compares_a_sibling_pin_in_its_own_clone(self):
+        # A fork keeps the org's module path, so the pin is still internal. Its lag
+        # and its compare link come from the clone the run read, which is the fork's.
+        repos = {"ledger": FakeRepo(behind=2, url="https://github.com/alice/ledger")}
+        d = resolver(repos=repos).resolve(dep(name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
+                                              version="v0.0.0-20260901000000-bda511aea589", internal=True,
+                                              scope="tool", datasource="goproxy"))
+        self.assertEqual(d["upstream"]["url"], "https://github.com/alice/ledger/compare/bda511aea589...main")
+
+    def test_an_internal_image_links_to_the_namespace_it_is_named_in(self):
+        tags = ["v0.0.0-20260910000000-aaaaaaaaaaaa", "v0.0.0-20260901000000-bbbbbbbbbbbb"]
+        r = resolve.Resolver(FakeSources(oci_tags=tags), "alice", {}, NOW)
+        d = r.resolve(dep(ecosystem="image", name="ghcr.io/codesweep-ai/sandbox-agents", package="ghcr.io/codesweep-ai/sandbox-agents",
+                          version="v0.0.0-20260901000000-bbbbbbbbbbbb", datasource="oci", scope="build", internal=True))
+        self.assertEqual(d["upstream"]["url"], "https://github.com/codesweep-ai/sandbox/pkgs/container/sandbox-agents")
+        self.assertEqual(d["lag"]["builds"], 1)
 
     def test_an_internal_action_counts_commits_in_its_directory(self):
         repos = {"dashboards": FakeRepo(behind=8, touching=1)}
@@ -576,6 +594,19 @@ class Actions(unittest.TestCase):
         self.assertEqual(act["id"], "p:actions:actions")
         self.assertEqual(act["decline"]["accepted"]["finding"], "major")
 
+    def test_a_fork_proposes_a_decline_in_its_own_copy_of_this_repository(self):
+        from collector import actions
+        d = dep(ecosystem="actions", name="actions/checkout", version="v4", scope="ci", status="major", level="warning",
+                upstream={"latest": "6.0.0"}, sources=[{"path": ".github/workflows/ci.yml", "line": 12}])
+        p = self.project(d)
+        p["_actions"] = actions.build([p])
+        doc = actions.agent_document({"generated": "2026-09-12T00:00:00Z", "org": "o", "owner": "alice", "projects": [p]},
+                                     "https://alice.github.io/dashboards/", "spec")
+        (act,) = doc["projects"][0]["actions"]
+        self.assertEqual((doc["org"], doc["owner"], act["decline"]["repo"]), ("o", "alice", "alice/dashboards"))
+        self.assertIn("deps-config.json in alice/dashboards", doc["workflow"][-1])
+        self.assertTrue(act["page"].startswith("https://alice.github.io/dashboards/deps?project=p#"))
+
     def test_an_accepted_record_is_no_work(self):
         from collector import actions
         d = dep(status="vulnerable", level="critical", vulnerabilities=[{"id": "GO-1", "severity": "high"}], accepted={"reason": "not_used"})
@@ -622,6 +653,21 @@ class Catalog(unittest.TestCase):
         self.assertTrue(all(c["group"] in GROUPS and c["gives"] and c["url"].startswith("https://") for c in CATALOG))
 
 
+    def test_a_fork_reads_its_own_repositories_and_site(self):
+        from collector.catalog import entries
+        byid = {c["id"]: c for c in entries("alice", "https://alice.github.io/dashboards/",
+                                            "https://alice.github.io/dashboards/deps.json")}
+        self.assertEqual(byid["github-git"]["url"], "https://github.com/alice")
+        self.assertEqual((byid["status-files"]["url"], byid["status-files"]["hosts"]), ("https://alice.github.io/", ["alice.github.io"]))
+        self.assertEqual(byid["previous"]["url"], "https://alice.github.io/dashboards/deps.json")
+
+    def test_a_run_with_no_site_names_no_status_file_or_previous_file(self):
+        from collector.catalog import entries
+        ids = {c["id"] for c in entries("alice")}
+        self.assertIn("github-git", ids)
+        self.assertFalse(ids & {"status-files", "previous"})
+
+
 class Feed(unittest.TestCase):
     def test_the_feed_announces_each_action_to_fix_once_dated_when_first_seen(self):
         import xml.etree.ElementTree as ET
@@ -640,3 +686,15 @@ class Feed(unittest.TestCase):
         self.assertEqual(entries[1].find("a:link", ns).get("href"), "https://example.org/d/deps?view=upgrades#action-dep|x")
         self.assertIn("How: npm install x@2", entries[1].find("a:summary", ns).text)
         self.assertEqual(root.find("a:author/a:name", ns).text, "o dashboards")
+
+    def test_a_fork_keeps_the_org_name_and_ids_its_entries_by_its_own_owner(self):
+        import xml.etree.ElementTree as ET
+        from collector.__main__ import atom_feed
+        data = {"org": "o", "owner": "alice", "generated": "2026-09-13T05:17:00Z", "seen": {},
+                "actions": [{"key": "dep|x", "id": "action-dep|x", "kind": "dep", "tier": "fix", "type": "security",
+                             "title": "Upgrade x", "result": "", "why": "", "evidence": [], "projects": ["a"]}]}
+        root = ET.fromstring(atom_feed(data, "https://alice.github.io/dashboards/"))
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        self.assertEqual(root.find("a:entry/a:id", ns).text, "urn:alice:deps:action:dep|x")
+        self.assertEqual(root.find("a:author/a:name", ns).text, "o dashboards")
+        self.assertEqual(root.find("a:link[@rel='self']", ns).get("href"), "https://alice.github.io/dashboards/deps-feed.xml")

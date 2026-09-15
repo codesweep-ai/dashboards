@@ -41,17 +41,29 @@ jobs:
       # lives in the deployment and never enters the repository. It also holds
       # the facts about exact versions that a run need not ask for again.
       #
+      # The site, and so the previous file and the status files, is wherever
+      # this repository publishes, which configure-pages reads from its Pages
+      # settings. The collector reads the repositories of this repository's own
+      # owner. A fork therefore collects its own projects and its own history.
+      # GitHub reports a custom domain's address as http even where it serves
+      # https, so the scheme is raised before any link is written from it.
+      #
       # deps-actions.json is every recommended change, for an agent to make.
       # deps-feed.xml is the alert channel, an Atom feed any reader can follow.
       # deps.cdx.json is the same inventory as a CycloneDX SBOM with VEX.
+      - id: pages
+        uses: actions/configure-pages@v5
+
       - name: run the collector
         env:
           GH_TOKEN: ${{ github.token }}
           GOTOOLCHAIN: auto
           PYTHONDONTWRITEBYTECODE: "1"
-        run: >-
-          python3 -m collector --output deps.json --actions deps-actions.json --feed deps-feed.xml --sbom deps.cdx.json
-          --previous https://codesweep.ai/dashboards/deps.json
+          SITE: ${{ steps.pages.outputs.base_url }}
+        run: |
+          SITE="${SITE/#http:/https:}"
+          python3 -m collector --output deps.json --actions deps-actions.json --feed deps-feed.xml --sbom deps.cdx.json \
+            --owner "$GITHUB_REPOSITORY_OWNER" --site "$SITE/" --previous "$SITE/deps.json"
 
       # A file that does not match SPEC.md would publish a broken page or mislead
       # an agent, so it stops here rather than at deploy.

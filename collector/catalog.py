@@ -3,16 +3,21 @@
 The page shows this list, the actions file carries it, and SPEC.md's table
 describes the same entries in full; tests/test_resolve.py checks the table
 names every one.
+
+The three project sources depend on where a run reads, so `entries` fills in
+their addresses: a fork reads its own owner's repositories and its own site.
 """
+
+import urllib.parse
 
 CATALOG = [
     # --- the projects themselves ---------------------------------------------------
-    {"id": "github-git", "group": "projects", "name": "GitHub repositories", "url": "https://github.com/codesweep-ai",
+    {"id": "github-git", "group": "projects", "name": "GitHub repositories", "url": "https://github.com",
      "gives": "Each project's manifests, commit history and source code, and the tags of actions with no releases",
      "license": "each repository's own", "hosts": ["github.com"]},
-    {"id": "status-files", "group": "projects", "name": "Project status files", "url": "https://codesweep.ai/",
-     "gives": "Each project's description", "license": "each project's own", "hosts": ["codesweep.ai"]},
-    {"id": "previous", "group": "projects", "name": "The previous deps.json", "url": "https://codesweep.ai/dashboards/deps.json",
+    {"id": "status-files", "group": "projects", "name": "Project status files", "url": "https://pages.github.com",
+     "gives": "Each project's description", "license": "each project's own", "hosts": []},
+    {"id": "previous", "group": "projects", "name": "The previous deps.json", "url": "https://pages.github.com",
      "gives": "Trend history, when each gap was first seen, and facts about versions already looked up",
      "license": "this site's own", "hosts": []},
 
@@ -91,3 +96,30 @@ CATALOG = [
 
 GROUPS = {"projects": "The projects", "versions": "Versions and releases", "support": "Support windows",
           "security": "Security", "licenses": "Packages and licenses"}
+
+
+def entries(owner, site=None, previous=None):
+    """The catalog for one run, with the project sources at the addresses it read.
+
+    With no site, no status file is read, so that entry is left out. The previous
+    file is named by its URL when it came from one, and otherwise by where the
+    site publishes it.
+    """
+    out = []
+    for c in CATALOG:
+        c = dict(c)
+        if c["id"] == "github-git":
+            c["url"] = f"https://github.com/{owner}"
+        elif c["id"] == "status-files":
+            if not site:
+                continue
+            c["url"] = urllib.parse.urljoin(site, "/")
+            c["hosts"] = [urllib.parse.urlparse(site).hostname]
+        elif c["id"] == "previous":
+            url = previous if (previous or "").startswith("https://") else \
+                (urllib.parse.urljoin(site, "deps.json") if site else None)
+            if not url:
+                continue
+            c["url"] = url
+        out.append(c)
+    return out

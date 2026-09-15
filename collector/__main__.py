@@ -153,7 +153,7 @@ def atom_feed(data, site, limit=100):
     for first, a, summary in entries[:limit]:
         items.append(
             "<entry>"
-            f"<id>urn:{escape(data['org'])}:deps:action:{escape(a['key'])}</id>"
+            f"<id>urn:{escape(data.get('owner') or data['org'])}:deps:action:{escape(a['key'])}</id>"
             f"<title>{escape(a['title'])}</title>"
             f"<published>{escape(first)}</published><updated>{escape(first)}</updated>"
             f"<link rel=\"alternate\" type=\"text/html\" href={quoteattr(page + '?view=upgrades#' + a['id'])}/>"
@@ -204,11 +204,21 @@ def main(argv=None):
     ap.add_argument("--sbom", help="also write the file as a CycloneDX SBOM with VEX, here")
     ap.add_argument("--actions", help="also write every project's actions, for an agent to follow, here")
     ap.add_argument("--no-reachability", action="store_true", help="skip govulncheck, for a quicker local run")
+    ap.add_argument("--owner", help="the GitHub owner whose repositories to read; $GITHUB_REPOSITORY_OWNER, else the org")
+    ap.add_argument("--site", help="where this site is published; the config's site when the owner is the org")
     args = ap.parse_args(argv)
 
     index, config = load(args.projects), load(args.config)
+    # Whose repositories to read is a different question from whose packages are
+    # siblings. A fork keeps the org's module paths, npm scope and image names, so
+    # `org` still decides what is internal. The fork's own owner and site decide
+    # which repositories, status files and links the run reads.
     org = config["org"]
-    site = config.get("site")
+    owner = args.owner or os.environ.get("GITHUB_REPOSITORY_OWNER") or org
+    site = args.site or (config.get("site") if owner == org else None)
+    if not site:
+        log(f"no site given for {owner}, so no status file is read and links are relative")
+    repository = os.environ.get("GITHUB_REPOSITORY") or f"{owner}/dashboards"
     names = [p["name"] for p in index["projects"]] + [n for n in config.get("include", [])
                                                      if n not in {p["name"] for p in index["projects"]}]
     status_paths = {p["name"]: p.get("status") for p in index["projects"]}
@@ -232,7 +242,7 @@ def main(argv=None):
                 [s["built"]["path"] for s in snapshots if s["project"] == name]
         dest = os.path.join(workdir, name)
         shutil.rmtree(dest, ignore_errors=True)
-        url = f"https://github.com/{org}/{name}"
+        url = f"https://github.com/{owner}/{name}"
         try:
             return name, gitrepo.clone(url, dest, extra), None
         except gitrepo.GitError as exc:
@@ -246,7 +256,7 @@ def main(argv=None):
     resolver = Resolver(src, org, repos, now)
     projects = []
     for name, repo, err in cloned:
-        project = {"name": name, "repo": {"full_name": f"{org}/{name}", "url": f"https://github.com/{org}/{name}"}}
+        project = {"name": name, "repo": {"full_name": f"{owner}/{name}", "url": f"https://github.com/{owner}/{name}"}}
         if err:
             log(f"{name}: {err}")
             project.update(error=err, dependencies=[], manifests=[])
@@ -428,17 +438,19 @@ def main(argv=None):
         "schema": SCHEMA,
         "generated": generated,
         "org": org,
+        "owner": owner,
         "levels": list(LEVELS),
         "projects": sorted(projects, key=lambda p: p["name"]),
         "lifecycle": lifecycle_table(projects),
         "actions": org_actions,
         "history": history(previous, projects, generated),
         "seen": seen,
-        "data_sources": catalog.CATALOG,
+        "data_sources": catalog.entries(owner, site, args.previous),
         "sources": client.report(),
         "authenticated": bool(token),
     }
-    agent = actions.agent_document(out, site, f"https://github.com/{org}/dashboards/blob/main/SPEC.md#the-actions-file")
+    agent = actions.agent_document(out, site, f"https://github.com/{repository}/blob/main/SPEC.md#the-actions-file",
+                                   repository)
     for p in projects:
         p.pop("_actions", None)
     # Compact, and without the fields a record leaves empty: the file carries
@@ -453,14 +465,14 @@ def main(argv=None):
 
     if args.feed:
         with open(args.feed, "w") as fh:
-            fh.write(atom_feed(out, config.get("site")))
+            fh.write(atom_feed(out, site))
     if args.actions:
         with open(args.actions, "w") as fh:
             json.dump(_prune(agent), fh, indent=1)
             fh.write("\n")
     if args.sbom:
         with open(args.sbom, "w") as fh:
-            json.dump(sbom.cyclonedx(_prune(out), config.get("site")), fh, separators=(",", ":"))
+            json.dump(sbom.cyclonedx(_prune(out), site), fh, separators=(",", ":"))
             fh.write("\n")
 
     if not args.keep:

@@ -19,6 +19,10 @@
     {
       "date": "2026-09-15",
       "text": "The codesweep-ai name is not part of the defect. The repository owner wants every page to keep it in a fork, so the title in `projects.json` and `ci.html` stays. Only where a page reads its data from has to follow the fork."
+    },
+    {
+      "date": "2026-09-15",
+      "text": "The dependencies page had the deeper form of this. The collector's `org` both named whose repositories to clone and which modules and packages count as siblings. A fork keeps codesweep-ai's module paths and npm scope, so it could not change `org` without losing its siblings. Its build also read upstream's previous `deps.json`, so a fork's history never accumulated."
     }
   ],
   "links": []

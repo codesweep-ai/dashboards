@@ -351,11 +351,13 @@ class Resolver:
             builds = sorted({versions.pseudo(t)[0] for t in tags
                              if versions.pseudo(t) and re.fullmatch(r"v0\.0\.0-\d{14}-[0-9a-f]{12}", t)})
             newer = [b for b in builds if b > stamp[0]]
-            # ghcr.io/<org>/sandbox-slim-agents is published by the sandbox repository.
+            # ghcr.io/<org>/sandbox-slim-agents is published by the sandbox repository,
+            # under the namespace the image is named in, which a fork does not rename.
+            namespace = repo.split("/", 1)[0] if "/" in repo else self.org
             dep["provider"] = base.split("-")[0]
             dep["upstream"] = {"latest_date": iso(builds[-1]) if builds else None,
                                "version_date": iso(stamp[0]),
-                               "url": f"https://github.com/{self.org}/{base.split('-')[0]}/pkgs/container/{base}"}
+                               "url": f"https://github.com/{namespace}/{base.split('-')[0]}/pkgs/container/{base}"}
             if builds:
                 newest_tag = next((t for t in tags if versions.pseudo(t) and versions.pseudo(t)[0] == builds[-1]
                                    and re.fullmatch(r"v0\.0\.0-\d{14}-[0-9a-f]{12}", t)), None)
@@ -540,7 +542,7 @@ class Resolver:
             lag["off_branch"] = True
         dep["lag"] = lag
         dep["upstream"] = {"latest_date": iso(repo.committed), "version_date": iso(pinned_at),
-                           "url": f"https://github.com/{self.org}/{repo_name}/compare/{sha[:12]}...{repo.branch or 'HEAD'}"}
+                           "url": f"{repo.url}/compare/{sha[:12]}...{repo.branch or 'HEAD'}"}
         if behind and pinned_at and repo.committed:
             dep["libyears"] = round((repo.committed - pinned_at).total_seconds() / 86400 / 365.25, 2)
 

@@ -196,9 +196,19 @@ and it needs `git`. Reachability also needs Go, which builds govulncheck from th
 | `--keep` | a temporary directory | clone here and leave the clones |
 | `--jobs` | 12 | records resolved at once |
 | `--no-reachability` | | skip govulncheck |
+| `--owner` | `$GITHUB_REPOSITORY_OWNER`, else `org` | the GitHub owner whose repositories are read |
+| `--site` | the config's `site`, when the owner is `org` | where this site is published, for status files and links |
 
-The site's build runs it with `--actions`, `--feed`, `--sbom` and `--previous` pointing at the published
-file. Every request identifies the collector in its `User-Agent`, and gives up after 30 seconds. A
+The site's build runs it with `--actions`, `--feed` and `--sbom`. It passes `--site` as the address this
+repository's Pages settings give, and `--previous` as the dependencies file published there.
+
+**A fork reads its own projects.** `org` names the namespace of the Go modules, npm packages and images
+that count as siblings, and a fork does not rename those. `--owner` names whose repositories are cloned,
+and `--site` where the status files and the previous file are read. So a fork's build reads the fork's
+repositories and its own history, and still knows `github.com/codesweep-ai/ledger` for a sibling. With
+no site, no status file is read and the links the collector writes are relative.
+
+Every request identifies the collector in its `User-Agent`, and gives up after 30 seconds. A
 request that fails is retried up to four times with a growing pause, and a 429 waits as long as its
 `Retry-After` asks. A few hosts that throttle bursts get a cap on requests in flight at once.
 
@@ -212,9 +222,9 @@ in short, and the page shows it under Sources.
 
 | Source | Read from | What the collector takes | Access | Data terms | Notes |
 |---|---|---|---|---|---|
-| [GitHub repositories](https://github.com/codesweep-ai) | `github.com/codesweep-ai/<project>` over git | Manifests, lockfiles, workflows, Containerfiles, env files, deployment YAML, `.ABOUT` files and pinned files; commit history for internal pins; the full source govulncheck reads; tags, over `git ls-remote`, for an action with no releases | the build's token, sent only to github.com | each repository's own | Clones are blobless and sparse, so only manifest files are downloaded until govulncheck needs the rest. |
-| [Project status files](https://codesweep.ai/) | each project's status file under `codesweep.ai` | The one-line description a project card shows | none | each project's own | The same files the CI page reads. |
-| [The previous deps.json](https://codesweep.ai/dashboards/deps.json) | `codesweep.ai/dashboards/deps.json`, as `--previous` | `history`, `seen`, and each exact version's licenses, provenance and source repository, and each Fedora build's source package and license | none | this site's own | A missing file starts history again, and every fact is asked for afresh. |
+| [GitHub repositories](https://github.com/codesweep-ai) | `github.com/<owner>/<project>` over git | Manifests, lockfiles, workflows, Containerfiles, env files, deployment YAML, `.ABOUT` files and pinned files; commit history for internal pins; the full source govulncheck reads; tags, over `git ls-remote`, for an action with no releases | the build's token, sent only to github.com | each repository's own | Clones are blobless and sparse, so only manifest files are downloaded until govulncheck needs the rest. |
+| [Project status files](https://codesweep.ai/) | each project's status file, resolved against `--site` | The one-line description a project card shows | none | each project's own | The same files the CI page reads. |
+| [The previous deps.json](https://codesweep.ai/dashboards/deps.json) | `deps.json` under `--site`, as `--previous` | `history`, `seen`, and each exact version's licenses, provenance and source repository, and each Fedora build's source package and license | none | this site's own | A missing file starts history again, and every fact is asked for afresh. |
 
 **Versions and releases**
 
@@ -270,7 +280,8 @@ in short, and the page shows it under Sources.
 {
   "schema": 1,
   "generated": "2026-09-13T05:17:00Z",
-  "org": "codesweep-ai",
+  "org": "codesweep-ai",              // the namespace whose packages count as siblings
+  "owner": "codesweep-ai",            // whose repositories were read; a fork's own owner in a fork
   "levels": ["idle", "good", "info", "warning", "serious", "critical"],
   "projects": [ /* see below */ ],
   "lifecycle": [ /* every release cycle in use, once: the record's lifecycle fields, plus
@@ -701,6 +712,7 @@ https://codesweep.ai/dashboards/deps-actions.json
   "schema": 1,
   "generated": "2026-09-12T20:56:03Z",
   "org": "codesweep-ai",
+  "owner": "codesweep-ai",           // whose repositories to clone and edit
   "about": "…",
   "workflow": ["…"],                 // how to take the actions: order, commits, checks, declining
   "tiers": { "fix": "…", "plan": "…", "routine": "…" },
@@ -738,7 +750,7 @@ https://codesweep.ai/dashboards/deps-actions.json
         "done_when": "no advisory affects the pinned version: 4.1.11 or newer"
       } ],
       "page": "https://codesweep.ai/dashboards/deps?project=tracer#action-…",
-      "decline": { "file": "deps-config.json", "repo": "codesweep-ai/dashboards",
+      "decline": { "file": "deps-config.json", "repo": "codesweep-ai/dashboards",  // the repository that built this file
                    "accepted": { "project": "tracer", "name": "vitest", "finding": "GHSA-…", "reason": "tolerable_risk",
                                  "note": "…", "until": "YYYY-MM-DD", "version": "2.1.9" },
                    "reasons": ["fix_started", "inaccurate", "no_bandwidth", "not_used", "tolerable_risk"] }
@@ -772,8 +784,8 @@ https://codesweep.ai/dashboards/deps-actions.json
 {
   "schema": 1,
   "comment": "…",                             // for a reader of the file; nothing reads it
-  "org": "codesweep-ai",
-  "site": "https://codesweep.ai/dashboards/",  // where projects.json's status paths resolve
+  "org": "codesweep-ai",                      // the namespace whose modules, packages and images are siblings
+  "site": "https://codesweep.ai/dashboards/",  // where org publishes this site; a fork passes --site instead
   "include": ["dashboards"],                  // repositories read besides the projects in projects.json
   "pins": [ {
     "project": "sandbox",

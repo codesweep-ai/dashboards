@@ -26,9 +26,9 @@ DEPS_TMP   := $(shell mktemp -u -t deps.XXXXXX.json)
 # The projects whose status files the preview mirrors. Read from projects.json
 # so this list cannot drift from the one the page actually loads.
 PROJECTS := $(shell $(PYTHON) -c "import json;print(' '.join(p['name'] for p in json.load(open('projects.json'))['projects']))" 2>/dev/null)
-# This checkout's repository, and the owner whose projects `status` reads, so a
-# fork previews its own runs. Actions sets GITHUB_REPOSITORY, and elsewhere it
-# comes from the origin remote. Set OWNER to preview another owner's projects.
+# This checkout's repository, and the owner whose projects `status` and the
+# collector read, so a fork previews its own. Actions sets GITHUB_REPOSITORY, and
+# elsewhere it comes from the origin remote. Set OWNER to read another owner's.
 REPOSITORY ?= $(or $(GITHUB_REPOSITORY),$(shell git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#\.git$$##'))
 OWNER      ?= $(firstword $(subst /, ,$(REPOSITORY)))
 
@@ -90,7 +90,7 @@ status:
 ## without one it reads github.com's release feeds, which list fewer releases.
 dependencies:
 	@mkdir -p $(PREVIEW)/dashboards
-	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --output $(PREVIEW)/dashboards/deps.json \
+	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --owner $(OWNER) --output $(PREVIEW)/dashboards/deps.json \
 	  --feed $(PREVIEW)/dashboards/deps-feed.xml --sbom $(PREVIEW)/dashboards/deps.cdx.json \
 	  --actions $(PREVIEW)/dashboards/deps-actions.json
 
@@ -124,7 +124,7 @@ data:
 test:
 	@$(PYTHON) -m py_compile action/ci-status && echo "test: action/ci-status compiles"
 	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s tests -t . -q
-	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --only dashboards --no-reachability --output $(DEPS_TMP) \
+	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --owner $(OWNER) --only dashboards --no-reachability --output $(DEPS_TMP) \
 	  >/dev/null 2>$(DEPS_TMP).log || { cat $(DEPS_TMP).log >&2; exit 1; }
 	@$(PYTHON) scripts/check-deps.py $(DEPS_TMP)
 	@if [ -n "$$GH_TOKEN$$GITHUB_TOKEN" ]; then \
