@@ -26,6 +26,11 @@ DEPS_TMP   := $(shell mktemp -u -t deps.XXXXXX.json)
 # The projects whose status files the preview mirrors. Read from projects.json
 # so this list cannot drift from the one the page actually loads.
 PROJECTS := $(shell $(PYTHON) -c "import json;print(' '.join(p['name'] for p in json.load(open('projects.json'))['projects']))" 2>/dev/null)
+# This checkout's repository, and the owner whose projects `status` reads, so a
+# fork previews its own runs. Actions sets GITHUB_REPOSITORY, and elsewhere it
+# comes from the origin remote. Set OWNER to preview another owner's projects.
+REPOSITORY ?= $(or $(GITHUB_REPOSITORY),$(shell git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#\.git$$##'))
+OWNER      ?= $(firstword $(subst /, ,$(REPOSITORY)))
 
 .PHONY: help deps tokens build test check ci lint actionlint prose refs oss data ledger preview status dependencies repin clean
 
@@ -66,12 +71,13 @@ $(PREVIEW)/dashboards: $(SITE)
 ## pages never do this: they read static files and hold no token.
 status:
 	@test -n "$(PROJECTS)" || { echo "status: no projects in projects.json" >&2; exit 1; }
+	@test -n "$(OWNER)" || { echo "status: no owner, since origin is not on GitHub. Set OWNER." >&2; exit 1; }
 	@test -n "$$GH_TOKEN$$GITHUB_TOKEN" || { \
 	  echo "status: no GH_TOKEN in the environment. Run:" >&2; \
 	  echo "    export GH_TOKEN=\$$(gh auth token)" >&2; exit 1; }
 	@for p in $(PROJECTS); do \
 	  mkdir -p $(PREVIEW)/$$p; \
-	  CI_STATUS_OUTPUT=$(PREVIEW)/$$p/ci-status.json ./action/ci-status "codesweep-ai/$$p" >/dev/null \
+	  CI_STATUS_OUTPUT=$(PREVIEW)/$$p/ci-status.json ./action/ci-status "$(OWNER)/$$p" >/dev/null \
 	    || { echo "status: $$p failed" >&2; exit 1; }; \
 	  echo "  $$p"; \
 	done
@@ -122,7 +128,7 @@ test:
 	  >/dev/null 2>$(DEPS_TMP).log || { cat $(DEPS_TMP).log >&2; exit 1; }
 	@$(PYTHON) scripts/check-deps.py $(DEPS_TMP)
 	@if [ -n "$$GH_TOKEN$$GITHUB_TOKEN" ]; then \
-	  CI_STATUS_OUTPUT=$(STATUS_TMP) ./action/ci-status codesweep-ai/dashboards >/dev/null && \
+	  CI_STATUS_OUTPUT=$(STATUS_TMP) ./action/ci-status $(REPOSITORY) >/dev/null && \
 	  $(PYTHON) scripts/check-status.py $(STATUS_TMP); \
 	else \
 	  echo "test: SKIP the end-to-end run, no GH_TOKEN in the environment"; \

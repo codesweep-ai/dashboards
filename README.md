@@ -39,6 +39,26 @@ project. A project pins it by commit, `codesweep-ai/dashboards/action@<sha>`, ra
 branch: `@main` would mean that project's build runs whatever this repository holds today.
 [CONTRIBUTING.md](CONTRIBUTING.md) says what changing it then costs.
 
+### In a fork
+
+The page works unchanged in a fork, and shows the fork's own projects. Its paths are relative, so it
+reads the status files on the host that serves it. A fork owned by `alice` serves the page at
+`alice.github.io/dashboards/ci`, which reads `alice.github.io/lint/ci-status.json` and the rest. The
+page names the owner it finds in those files.
+
+A project appears once its fork publishes a status:
+
+1. Create a fork of the project under the same owner.
+2. Enable Actions on the fork's **Actions** tab, since GitHub leaves them off in a fork.
+3. Set the fork's Pages source to **GitHub Actions**, as in step 2 above.
+
+The action reads the workflow history of the repository that calls it. A fork's pin to
+`codesweep-ai/dashboards/action` therefore reports the fork's own builds. A project nobody has forked
+is shown as "no status".
+
+`make status` takes the owner from the origin remote, so a fork's preview shows the fork's runs. Set
+`OWNER` to preview another owner's projects.
+
 [SPEC.md](SPEC.md) is the contract: what a status file must contain, and what a page may assume
 about one. A project that satisfies it needs to know nothing else about these pages.
 

@@ -2,8 +2,9 @@
 """Check projects.json is well formed, and that every status URL is same-origin.
 
 Same-origin is the property the whole design rests on: a status URL that left
-codesweep.ai would need CORS on the other end and would spend the GitHub API's
-anonymous quota. See SPEC.md.
+the host serving the page would need CORS on the other end and would spend the
+GitHub API's anonymous quota. A relative URL is also what lets a fork read its
+own owner's projects. See SPEC.md.
 """
 
 import json
