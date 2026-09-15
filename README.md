@@ -50,8 +50,9 @@ Because each project publishes independently, the page is explicit about what it
   the page or count against the green tally.
 - **A file older than 72 hours.** The card footer is flagged and the project is named in a notice.
   Green from three weeks ago is not the same claim as green now, and the page says which it is.
-  Nothing refreshes a status on a schedule, deliberately: a cron would update the timestamp without
-  updating the facts, hiding a project that has quietly stopped building.
+  A status is as old as the project's last Pages build. A project whose Pages workflow also runs
+  after a scheduled workflow republishes on that schedule, so its file never reaches 72 hours. The
+  run dates on its card are then what show that it has stopped building.
 
 ## The dependencies page
 
