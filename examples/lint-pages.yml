@@ -45,8 +45,8 @@ name: pages
 # a waiting one, which then shows as cancelled in this workflow's row.
 #
 # prune-images runs every day, so the site republishes daily whether or not
-# anything was pushed. The status file is never old enough for the dashboard to
-# flag, and the run dates on the card are what show a quiet repository.
+# anything was pushed. The dashboard dates a repository by its latest ci run, so
+# the daily republish does not hide one that has stopped building.
 on:
   workflow_run:
     workflows: [ci, npm, publish images, prune-images]
