@@ -18,7 +18,7 @@
   {
    "project": "sandbox",
    "path": "internal/fcdisk/build.go",
-   "match": "DefaultKVerPin = \"([^\"]+)\"",
+   "match": "DefaultKVerPin = (?:kojiPinPrefix \\+ )?\"(?:koji:)?([^\"]+)\"",
    "name": "kernel",
    "label": "Linux kernel (Fedora guest)",
    "datasource": "fedora-kernel",
@@ -141,5 +141,22 @@
    "runtime"
   ]
  },
- "accepted": []
+ "accepted": [
+  {
+   "project": "sandbox",
+   "name": "kernel",
+   "version": "7.2.5-200.fc44",
+   "finding": "current",
+   "reason": "tolerable_risk",
+   "note": "Firecracker has not validated the 7.2 line, and we are not moving to 6.18. The guest kernel is Fedora 7.2.5-200.fc44, the build bodhi pushed to stable for F44, fetched from koji and checked against a committed digest. Moving to 6.18 would mean building a kernel from source against Firecracker's guest config. We will not do that. This is a decision, not a deferral. A vulnerability is deliberately not accepted here, so an advisory against this build still shows."
+  },
+  {
+   "project": "sandbox",
+   "name": "kernel",
+   "version": "7.2.5-200.fc44",
+   "finding": "eol",
+   "reason": "tolerable_risk",
+   "note": "The same decision as the entry above, for the end-of-life reading carried over from the 6.19 pin until the collector re-reads the repository. We run Fedora 7.2.5-200.fc44 and will not move to 6.18."
+  }
+ ]
 }
