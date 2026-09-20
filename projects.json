@@ -6,6 +6,7 @@
   { "name": "campaign", "status": "../campaign/ci-status.json" },
   { "name": "ledger",   "status": "../ledger/ci-status.json" },
   { "name": "lint",     "status": "../lint/ci-status.json" },
+  { "name": "npmrevs",  "status": "../npmrevs/ci-status.json" },
   { "name": "sandbox",  "status": "../sandbox/ci-status.json" },
   { "name": "tracer",   "status": "../tracer/ci-status.json" },
   { "name": "ui",       "status": "../ui/ci-status.json" },
