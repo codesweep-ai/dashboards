@@ -45,7 +45,7 @@ class Npm(unittest.TestCase):
         pkg = json.dumps({
             "dependencies": {"react": "^18.3.1", "@codesweep-ai/ui": "0.3.1-dev.20260909170256.1638d27"},
             "devDependencies": {"vite": "^8.0.14"},
-            "optionalDependencies": {"@codesweep-ai/cs-lint-linux-x64": "0.0.0"},
+            "optionalDependencies": {"@codesweep-ai/lint-linux-x64": "0.0.0"},
             "engines": {"node": ">=22.13"},
         }, indent=2)
         lock = json.dumps({"packages": {
@@ -59,7 +59,7 @@ class Npm(unittest.TestCase):
         self.assertEqual((react["version"], react["constraint"]), ("18.3.1", "^18.3.1"))
         self.assertEqual(by(deps, "vite")[0]["scope"], "dev")
         self.assertTrue(by(deps, "@codesweep-ai/ui")[0]["internal"])
-        self.assertEqual(by(deps, "@codesweep-ai/cs-lint-linux-x64"), [], "a publish placeholder is not a dependency")
+        self.assertEqual(by(deps, "@codesweep-ai/lint-linux-x64"), [], "a publish placeholder is not a dependency")
         node = by(deps, "node")[0]
         self.assertEqual((node["scope"], node["cycle"]), ("engines", "22"))
         esbuild = [i for i in installed if i["name"] == "esbuild"][0]

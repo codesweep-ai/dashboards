@@ -966,7 +966,8 @@ def _repo_from_url(url, org):
 
 
 def _guess_repo(name):
-    # @codesweep-ai/cs-ledger is published from ledger, @codesweep-ai/ui from ui.
+    # @codesweep-ai/ledger is published from ledger, @codesweep-ai/ui from ui.
+    # cs- is the old naming, still on npm until those packages are unpublished.
     return name.split("/")[-1].removeprefix("cs-")
 
 
