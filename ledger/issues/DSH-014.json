@@ -3,18 +3,25 @@
   "title": "An action met in full by another action in the same build is still listed as open",
   "type": "defect",
   "severity": "low",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "a8f887f"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. The three fold tests fail without the fold, and fail without the lockfile's `via`.\n\nThe collector's run of 2026-09-22T22:07:49Z over all nine projects has no refresh for tracer's `apps/viewer`. Its three packages sit on the vitest action with `cleared_by: [\"vitest\"]`. The `fixtures/test` refresh stays, since its fast-uri comes through a dependency nothing moves.\n\nThe vitest action's one step, run verbatim in a clean clone of tracer, left @vitest/mocker 4.1.11, vite 6.4.3 and esbuild 0.25.12 in the lockfile. An `npm audit --package-lock-only` run then reported no vulnerable package. All 102 viewer tests passed, and the build left its committed artifacts byte-identical. A headless Chrome screenshot shows the card in both themes."
   },
-  "resolution": null,
+  "resolution": "The extractor records which declared dependencies install each lockfile package. The resolver asks deps.dev what each planned move installs, and a copy no range could keep joins the action that makes the move. A refresh left with nothing is not listed.",
   "details": "`tracer:lock:tracer-apps-viewer-package-lock-json` refreshes three vulnerable copies in `apps/viewer`: `@vitest/mocker` 2.1.9, `vite` 5.4.21 and `esbuild` 0.21.5. All three are installed only through `vitest` 2.1.9, which `tracer:dep:github-com-vitest-dev-vitest` moves to 4.1.11. In pilot2 that upgrade met every change of the lock action, with the vulnerable copies gone rather than shadowed, yet the page still listed the lock action as open. An agent following the file makes an empty commit or reports the action by hand.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-22",
+      "text": "npm dedupes onto a copy already in the tree when the range allows it. In tracer that was the declared vite 6.4.3 rather than the 8.3.0 deps.dev resolved, and both clear the advisory. A declared copy that is itself vulnerable keeps its own action."
+    }
+  ],
   "links": []
 }

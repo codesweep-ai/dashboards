@@ -3,18 +3,25 @@
   "title": "A sibling Go sync tells an agent to run make repin, which moves every pin to main",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "4c85340"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. `test_a_sibling_pin_moves_to_its_head_commit_and_nothing_else` fails on the old code.\n\nThe collector's run of 2026-09-22T22:07:49Z over all nine projects emits no `make repin`. Each of its 23 Go syncs runs `go get -tool <command>@<lag.head> && go mod tidy`.\n\nThe dashboards action syncing ledger ran verbatim in a clean clone and exited 0. Then `go tool cs-ledger version` printed the pseudo-version of the commit the report names. `git status` showed `go.mod` and `go.sum`, and `make check` passed."
   },
-  "resolution": null,
+  "resolution": "A Go sync moves one pin to the commit in `lag.head`, in each module file that pins it, and nothing else.",
   "details": "Every Go `sync` action emits `make repin` as its one step. That target moves every sibling pin at once, so it cannot make one action as one commit. It resolves `@latest`, so it cannot reach the commit the action names in `lag.head`. In a campaign it pins a sibling's base instead of its frozen commit, and pilot2's qa measured it pinning lint's base. The step that makes one action is `go get <module>@<lag.head>` followed by `go mod tidy`.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-22",
+      "text": "Moving a sibling to its newest commit also raises any pin that commit requires. In dashboards the ledger sync moved the lint pin too, because ledger now requires a newer lint. That is minimal version selection, and the campaign's pin rules already say to select the other action first."
+    }
+  ],
   "links": []
 }

@@ -3,18 +3,26 @@
   "title": "ledger's ui sync runs npm where there is no package.json, and misses three steps",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "f3f9448",
+      "10cc896"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. `test_the_ui_pin_edits_the_go_constant_and_rebuilds_and_re_renders_after` fails on the old step builder.\n\nThe ledger ui sync from the collector's run of 2026-09-22T22:07:49Z ran verbatim in a clean clone, with its three edits made by hand. Every command exited 0, and none ran in `internal/ledger`. Both pages re-rendered at renderer 0.7.1, `make check` exited 0, and `make viewer-check` passed once the result was committed. `git status` held the viewer's manifest, lockfile and bundle, `render.go`, `MANUAL.md`, and both ledgers' pages and configs.\n\nIn campaign, the ui sync as printed left `make viewer-check` red on a stale `viewer.html`. With the `make viewer-build` step deps-config.json now adds, it passed."
   },
-  "resolution": null,
+  "resolution": "An npm step runs only where a package.json or its lockfile is. Any other place a pin is written, such as the constant a configured pin reads, gets an edit. The new `after` in deps-config.json lists the steps a move needs beyond its manifest, with entries for ledger and campaign.",
   "details": "`ledger:sync:ui-npm-codesweep-ai-ui` emits `npm install --save-exact @codesweep-ai/ui@dev` in `viewer` and again in `internal/ledger`. The second directory holds no `package.json`, only the `UIVersion` string in `render.go` that a pin in `deps-config.json` reads, so the command would create one. The version string needs an edit, not a command.\n\nThe action also cannot be done without three steps no manifest states. `viewer/index.html`, the bundle `assets.go` embeds, has to be rebuilt. Both committed pages, `ledger/ledger.html` and `fixtures/sandbox/ledger/ledger.html`, have to be re-rendered. `RendererVersion` has to move, as ledger's CONTRIBUTING.md requires when the rendered output changes. pilot1 found all three the hard way.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-22",
+      "text": "tracer pins @codesweep-ai/ui too and commits the viewer it builds. Its pin was current in this run, so no action exercised it and no `after` entry was added for it."
+    }
+  ],
   "links": []
 }

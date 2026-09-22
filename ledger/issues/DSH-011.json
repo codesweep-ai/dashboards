@@ -3,17 +3,19 @@
   "title": "An npm sync installs a dist-tag, which can move the pin backwards",
   "type": "defect",
   "severity": "high",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "441e86c"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. `test_an_internal_npm_pin_names_the_build_of_the_head_commit` and `test_a_sibling_pin_installs_the_build_of_its_head_commit_not_a_tag` fail on the old code.\n\nThe collector's run of 2026-09-22T22:07:49Z over all nine projects names no dist-tag. Each of its 5 npm syncs installs the exact version the registry built from the head commit.\n\nThe ui action syncing ledger ran verbatim in a clean clone. It moved `package.json` and `package-lock.json` to the build of ledger's head, which `npx cs-ledger version` printed, and `npm run check` exited 0."
   },
-  "resolution": null,
+  "resolution": "The resolver reads the registry's versions for an internal npm pin and records the one built from the head commit as `lag.version`. An npm sync installs that version exactly, and says it is waiting when the registry holds none.",
   "details": "An npm `sync` action emits `npm install --save-exact <package>@dev` for `@codesweep-ai/ui` and `@latest` for every other sibling. A tag moves, and the action means one version: the build of the commit in `lag.head`. On 2026-09-22 `@codesweep-ai/ledger@latest` was the build of 2026-09-15, older than the build of 2026-09-20 that ui pins, so `ui:sync:ledger-npm-codesweep-ai-ledger` run as printed moves the pin backwards. Through cs-npmrevs a tag other than `latest` answers npmjs.com's version rather than a campaign's.",
   "notes": [],
   "links": []

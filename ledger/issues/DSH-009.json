@@ -3,17 +3,19 @@
   "title": "The golangci-lint step adds a bogus tool line, and the build then fails",
   "type": "defect",
   "severity": "high",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "94dcebb"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. `test_a_tool_moves_by_its_command_and_its_module_file_is_never_tidied` and the extractor test for tool packages fail on the old code.\n\nThe collector's run of 2026-09-22T22:07:49Z over all nine projects has no step passing `-tool` a module path and none tidying a module file other than go.mod.\n\nThe ledger action for Go modules ran verbatim in a clean clone, and its 3 steps exited 0. `git status` showed `go.mod`, `go.sum`, `go.golangci.mod` and `go.golangci.sum`. The linter built and reported 0 issues, deadcode built, and `make check` exited 0. In the same clone the module-path form added a second tool line and printed `cannot find module providing package`. The plain module form without `-tool` left out `github.com/golangci/canonicalheader`, a requirement v2.13.2's command gained."
   },
-  "resolution": null,
+  "resolution": "The extractor names each tool on the source of the module that provides it, and `go get` moves a tool by that command. A module file other than go.mod is never tidied.",
   "details": "A `routine:go` action emits `go get -modfile=go.golangci.mod -tool github.com/golangci/golangci-lint/v2@v2.13.2`. The `-tool` flag names the module root rather than its command. Run as printed in a clone of ledger's main of 2026-09-22, it adds `github.com/golangci/golangci-lint/v2` to the tool block beside the real `.../v2/cmd/golangci-lint`, and prints `cannot find module providing package`. The pilots saw the linter's build then fail on a missing `go.sum` entry.\n\n`golang.org/x/tools` has the same fault the other way round. It is an indirect requirement in `go.golangci.mod` and the module of the `deadcode` tool in `go.mod`, and the action emits `go get -modfile=go.golangci.mod -tool golang.org/x/tools@v0.50.0`: a second bogus tool line, and `go.mod` never moves. `go mod tidy -modfile=go.golangci.mod`, the obvious repair, is wrong as well. Run on ledger's main of 2026-09-22, it adds 59 lines to `go.golangci.sum` and a requirement on ledger itself. Tidy reads the packages in the directory rather than the tool the file exists for.",
   "notes": [],
   "links": []

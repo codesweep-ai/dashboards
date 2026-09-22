@@ -3,17 +3,19 @@
   "title": "A Go toolchain action moves go.mod and leaves every other file its change names",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "5a7d393"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. The fixture test `test_a_toolchain_move_edits_every_module_file_and_the_containerfile` fails on the old step builder.\n\nThe collector's run of 2026-09-22T22:07:49Z over all nine projects emits a `go mod edit` step for each module file in all eight toolchain actions. The sandbox action also gets an edit at `image/Containerfile.base:273` naming `GO_VERSION` and its checksums.\n\nEach ran verbatim in a clean clone at the head the report names. The ledger action's two steps changed only `go.mod` and `go.golangci.mod`, and `make check` exited 0. In sandbox, the two steps and the edits made by hand changed only `go.mod`, `go.golangci.mod` and `image/Containerfile.base`. Its `make check` exited 0 in a full clone, since two of its tests cannot zip a git worktree. The edits by hand were the ARG, both checksums and the action's Node.js line. The image was not built."
   },
-  "resolution": null,
+  "resolution": "Each module file a Go floor sits in gets its own `go mod edit`, with `-modfile` for a file other than go.mod. Any other place the version is written gets an edit. A Containerfile ARG folded into the record keeps its name on its source, so the edit names it.",
   "details": "A `routine:runtime` action for the Go toolchain emits one step, `go mod edit -go=<version>`, while the change's own `files` name `go.golangci.mod` as well. Run as printed, it raises `go.mod` and leaves `go.golangci.mod` on the old floor, so the linter builds against it. The steps are built from the record's first source only.\n\nIn sandbox the same record also points at `ARG GO_VERSION` in `image/Containerfile.base`, and the action emits `go mod edit -go=1.27.1` with `cwd: image`, where no `go.mod` exists. It fails there, and the ARG and the checksums beside it never move.\n\nSeen in the report of 2026-09-22T05:24:19Z: `campaign`, `ledger`, `lint`, `npmrevs`, `tracer`, `vcr` and `sandbox:routine:runtime`.",
   "notes": [],
   "links": []

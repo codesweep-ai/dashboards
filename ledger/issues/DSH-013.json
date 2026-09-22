@@ -3,17 +3,19 @@
   "title": "A fix action's done_when names a version, and the registry moves under the plan",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier1",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "0ff4591"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make ci` passed at 10cc896, with 111 unit tests where main had 95, and with the end-to-end run of the action. The two done_when tests fail on the old wording.\n\nThe collector's run of 2026-09-22T22:07:49Z over all nine projects has 19 vulnerable changes, and no done_when among them names a version.\n\nThe tracer refresh of `fixtures/test` ran verbatim in a clean clone, exited 0, and landed fast-uri at 3.1.8 where `to` says 3.1.6. `npm audit --package-lock-only` then flagged nothing, which is what the done_when asks."
   },
-  "resolution": null,
+  "resolution": "A vulnerable change's done_when names the lockfile, module files or pin and the advisories, and never a version. SPEC.md and the file's workflow say a step's exit status is not its check.",
   "details": "A vulnerable change's `done_when` reads `no advisory affects the pinned version: 3.1.6 or newer`. The number is stale by the time anyone runs the step. In pilot2, 8 of 10 rows of one `npm audit fix` landed above the version the report named, and fast-uri landed at 3.1.8 rather than 3.1.6, both correctly. A version is also the wrong test: a newer release can carry an advisory of its own. The condition that matters is that the lockfile no longer carries a copy the advisory affects. `npm audit fix` exits 0 whether or not it changed anything, so its exit code proves nothing either, and the file does not say so.",
   "notes": [],
   "links": []
