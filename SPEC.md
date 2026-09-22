@@ -208,6 +208,10 @@ and `--site` where the status files and the previous file are read. So a fork's 
 repositories and its own history, and still knows `github.com/codesweep-ai/ledger` for a sibling. With
 no site, no status file is read and the links the collector writes are relative.
 
+The collector clones nothing for an owner that cannot be a GitHub name, such as a path, or for a
+`$GITHUB_REPOSITORY` that is not `owner/name`. It exits 2 and names the setting, because the clone would
+otherwise fail as `Authentication failed`, which points at credentials instead of at the owner.
+
 Every request identifies the collector in its `User-Agent`, and gives up after 30 seconds. A
 request that fails is retried up to four times with a growing pause, and a 429 waits as long as its
 `Retry-After` asks. A few hosts that throttle bursts get a cap on requests in flight at once.

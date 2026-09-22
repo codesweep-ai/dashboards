@@ -57,7 +57,9 @@ The action reads the workflow history of the repository that calls it. A fork's 
 is shown as "no status".
 
 `make status` takes the owner from the origin remote, so a fork's preview shows the fork's runs. Set
-`OWNER` to preview another owner's projects.
+`OWNER` to preview another owner's projects. Where origin is not on GitHub, such as a sandbox's local
+path, every target that reads GitHub stops at once and asks for `OWNER=` and `REPOSITORY=`. `make owner`
+prints the owner the targets would read.
 
 [SPEC.md](SPEC.md) is the contract: what a status file must contain, and what a page may assume
 about one. A project that satisfies it needs to know nothing else about these pages.

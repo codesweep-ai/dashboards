@@ -10,6 +10,7 @@ nothing needs one: without it the collector reads github.com's release feeds.
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -33,6 +34,24 @@ def load(path):
 
 def log(msg):
     print(f"deps: {msg}", file=sys.stderr, flush=True)
+
+
+GITHUB_OWNER = re.compile(r"^[A-Za-z0-9._-]+$")
+GITHUB_REPOSITORY = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
+
+
+def not_github(owner, repository):
+    """Why `owner` or `repository` names nothing on GitHub, or None when both can.
+
+    An owner taken from a remote that is not on GitHub reads as a path, and the
+    clone of github.com/<it>/... then fails as a credential error, which points
+    at the wrong cause.
+    """
+    if not GITHUB_OWNER.match(owner or ""):
+        return f"{owner!r} is not a GitHub owner. Name one with --owner or $GITHUB_REPOSITORY_OWNER."
+    if not GITHUB_REPOSITORY.match(repository):
+        return f"$GITHUB_REPOSITORY is {repository!r}, which is not owner/name. Unset it, or name this repository."
+    return None
 
 
 def summarise(project):
@@ -219,7 +238,10 @@ def main(argv=None):
     if not site:
         log(f"no site given for {owner}, so no status file is read and links are relative")
     repository = os.environ.get("GITHUB_REPOSITORY") or f"{owner}/dashboards"
-    names = [p["name"] for p in index["projects"]] + [n for n in config.get("include", [])
+    problem = not_github(owner, repository)
+    if problem:
+        ap.error(problem)
+    names =[p["name"] for p in index["projects"]] + [n for n in config.get("include", [])
                                                      if n not in {p["name"] for p in index["projects"]}]
     status_paths = {p["name"]: p.get("status") for p in index["projects"]}
     if args.only:

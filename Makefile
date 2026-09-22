@@ -32,11 +32,13 @@ DEPS_TMP   := $(shell mktemp -u -t deps.XXXXXX.json)
 PROJECTS := $(shell $(PYTHON) -c "import json;print(' '.join(p['name'] for p in json.load(open('projects.json'))['projects']))" 2>/dev/null)
 # This checkout's repository, and the owner whose projects `status` and the
 # collector read, so a fork previews its own. Actions sets GITHUB_REPOSITORY, and
-# elsewhere it comes from the origin remote. Set OWNER to read another owner's.
-REPOSITORY ?= $(or $(GITHUB_REPOSITORY),$(shell git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#\.git$$##'))
+# elsewhere it comes from the origin remote, including one cloned through an ssh
+# host alias such as github.com-fork. Set OWNER to read another owner's. Where
+# origin is not on GitHub, `owner` stops the run and asks for both.
+REPOSITORY ?= $(or $(GITHUB_REPOSITORY),$(shell git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com(-[^:/]*)?:|ssh://git@github\.com(-[^:/]*)?/)##; s#/$$##; s#\.git$$##'))
 OWNER      ?= $(firstword $(subst /, ,$(REPOSITORY)))
 
-.PHONY: help deps tokens build test check ci lint actionlint prose refs oss data ledger preview status dependencies repin clean
+.PHONY: help deps tokens build test check ci lint actionlint prose refs oss data ledger preview status dependencies repin clean owner
 
 .DEFAULT_GOAL := help
 
@@ -65,6 +67,20 @@ $(PREVIEW)/dashboards: $(SITE)
 	@cp $(SITE) $(PREVIEW)/dashboards/
 	@echo "build: $(PREVIEW)/dashboards is current"
 
+## owner: say whose repositories the targets read, and stop when there is nobody to name
+##
+## Every target that reads GitHub runs this first. An origin that is not on
+## GitHub, such as a sandbox's local path, leaves a path where owner/name should
+## be. Its first segment is no owner, and the clone of github.com/<it>/... fails
+## as "Authentication failed", which points at credentials instead.
+owner:
+	@printf '%s\n' "$(REPOSITORY)" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$$' && \
+	 printf '%s\n' "$(OWNER)" | grep -Eq '^[A-Za-z0-9._-]+$$' || { \
+	  echo "owner: REPOSITORY is '$(REPOSITORY)' and OWNER is '$(OWNER)', which name no GitHub repository." >&2; \
+	  echo "owner: origin is not on GitHub, so name both: make $(or $(MAKECMDGOALS),owner) OWNER=<owner> REPOSITORY=<owner>/dashboards" >&2; \
+	  exit 1; }
+	@echo "owner: reading $(OWNER)'s repositories, for $(REPOSITORY)"
+
 ## status: write each project's ci-status.json into the preview tree
 ##
 ## Stands in for what a project's own Pages build will publish, so the page can
@@ -73,9 +89,8 @@ $(PREVIEW)/dashboards: $(SITE)
 ##
 ## Needs a GitHub token in GH_TOKEN, which `gh auth token` prints. The published
 ## pages never do this: they read static files and hold no token.
-status:
+status: owner
 	@test -n "$(PROJECTS)" || { echo "status: no projects in projects.json" >&2; exit 1; }
-	@test -n "$(OWNER)" || { echo "status: no owner, since origin is not on GitHub. Set OWNER." >&2; exit 1; }
 	@test -n "$$GH_TOKEN$$GITHUB_TOKEN" || { \
 	  echo "status: no GH_TOKEN in the environment. Run:" >&2; \
 	  echo "    export GH_TOKEN=\$$(gh auth token)" >&2; exit 1; }
@@ -92,7 +107,7 @@ status:
 ## public registries about each dependency, and runs govulncheck over the Go
 ## projects, which takes a few minutes. It needs Go and no token. With GH_TOKEN set it reads GitHub releases through the API, and
 ## without one it reads github.com's release feeds, which list fewer releases.
-dependencies:
+dependencies: owner
 	@mkdir -p $(PREVIEW)/dashboards
 	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --owner $(OWNER) --output $(PREVIEW)/dashboards/deps.json \
 	  --feed $(PREVIEW)/dashboards/deps-feed.xml --sbom $(PREVIEW)/dashboards/deps.cdx.json \
@@ -125,7 +140,7 @@ data:
 ## rather than a pass: a run that checked nothing must never read as a run that
 ## checked everything. The collector's needs none, so it always runs, over this
 ## repository alone to keep it quick.
-test:
+test: owner
 	@$(PYTHON) -m py_compile action/ci-status && echo "test: action/ci-status compiles"
 	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m unittest discover -s tests -t . -q
 	@PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m collector --owner $(OWNER) --only dashboards --no-reachability --output $(DEPS_TMP) \
@@ -183,7 +198,7 @@ repin:
 	go mod tidy
 
 ## check: the gate a contributor runs before pushing
-check: data test prose refs oss
+check: owner data test prose refs oss
 
 ## ci: every gate the CI workflow runs, on this machine
 ##
