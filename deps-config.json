@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "comment": "What the dependencies collector cannot read from a manifest, and the policies it grades against. `org` is the namespace whose Go modules, npm packages and images count as siblings, and a fork keeps it. `site` is where org publishes this site; a fork's build passes its own site and owner instead. `include` names repositories read besides the projects in projects.json. A pin is a version written somewhere no extractor looks, with the upstream it tracks. A snapshot says when a project's floating packages were last resolved. `licenses` grades the licenses of code a project ships: an exact entry wins over a wildcard. `accepted` records findings left be on purpose, each with a reason and an expiry. An optional `sla` sets fix-by days per level; without it the page shows how long each gap has been open. SPEC.md describes every field.",
+ "comment": "What the dependencies collector cannot read from a manifest, and the policies it grades against. `org` is the namespace whose Go modules, npm packages and images count as siblings, and a fork keeps it. `site` is where org publishes this site; a fork's build passes its own site and owner instead. `include` names repositories read besides the projects in projects.json. A pin is a version written somewhere no extractor looks, with the upstream it tracks. A snapshot says when a project's floating packages were last resolved. `after` lists the steps a project needs once a dependency has moved, beyond what its manifest says. `licenses` grades the licenses of code a project ships: an exact entry wins over a wildcard. `accepted` records findings left be on purpose, each with a reason and an expiry. An optional `sla` sets fix-by days per level; without it the page shows how long each gap has been open. SPEC.md describes every field.",
  "org": "codesweep-ai",
  "site": "https://codesweep.ai/dashboards/",
  "include": ["dashboards"],
@@ -84,6 +84,18 @@
     "path": "image/tiers.env",
     "match": "^AGENTS_REF=\\S+:v0\\.0\\.0-(\\d{14})-"
    }
+  }
+ ],
+ "after": [
+  {
+   "project": "ledger",
+   "name": "@codesweep-ai/ui",
+   "steps": [
+    {"edit": "internal/ledger/render.go", "text": "raise RendererVersion, as CONTRIBUTING.md asks when the rendered page changes"},
+    {"run": "make viewer-build build", "cwd": "."},
+    {"run": "bin/cs-ledger render ledger && bin/cs-ledger render fixtures/sandbox/ledger", "cwd": "."},
+    {"edit": "MANUAL.md", "text": "set the renderer and @codesweep-ai/ui versions in the sample `cs-ledger version` line"}
+   ]
   }
  ],
  "licenses": {

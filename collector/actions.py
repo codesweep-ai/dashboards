@@ -208,7 +208,24 @@ def _each_place(d, sources, in_modfile, v):
     return steps
 
 
+def _npm_places(d, sources, cmd, v):
+    """`cmd` in each directory whose manifest or lockfile holds the package, and an edit anywhere else it is written."""
+    steps = []
+    for s in sources:
+        manifest = s["path"].rsplit("/", 1)[-1] in ("package.json", "package-lock.json")
+        step = {"run": cmd, "cwd": dir_of(s["path"])} if manifest else _set_at(d, s, v)
+        if step not in steps:
+            steps.append(step)
+    return steps
+
+
 def steps_for(d, to=None):
+    """What makes one record's change, then any steps deps-config.json says the move needs after it."""
+    own = _own_steps(d, to)
+    return own + [s for s in d.get("after") or [] if s not in own] if own else own
+
+
+def _own_steps(d, to=None):
     """What makes one record's change, as structured steps: a command to run, an edit to make, or a task to do."""
     t = to if to is not None else target(d)
     path = src_path(d)
@@ -232,7 +249,8 @@ def steps_for(d, to=None):
             if not built:
                 return [{"do": f"Install the build of {d['name']} made from commit {head[:12]} once the registry holds it: "
                                f"`npm view {d['name']} versions --json` lists them."}]
-            return run(f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{built}")
+            return _npm_places(d, sources, f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{built}",
+                               built)
         if d["ecosystem"] == "actions":
             head = (d.get("lag") or {}).get("head")
             return edit(f"uses: {d['name']}@{head or '<newest commit>'}", **{"from": (d.get("lag") or {}).get("pinned"), "to": head})
@@ -256,7 +274,7 @@ def steps_for(d, to=None):
         return _each_place(d, sources, lambda s: _go_get(d, s, version), version)
     if d["ecosystem"] == "npm" and t:
         version = d["fix"] if d.get("fix") and d.get("status") == "vulnerable" else t
-        return run(f"npm install {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{version}")
+        return _npm_places(d, sources, f"npm install {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{version}", version)
     if d["ecosystem"] == "pypi" and t:
         return run(f"pip install {d['name']}=={t}")
     if d["ecosystem"] == "actions" and t:

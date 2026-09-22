@@ -619,12 +619,13 @@ def declared_pin(pin, text):
 # --- a whole repository -------------------------------------------------------
 
 
-def repository(repo, org, pins=()):
+def repository(repo, org, pins=(), after=()):
     """Everything one checked-out repository declares.
 
     Returns a dict with `dependencies`, `installed` (npm lockfile contents, for
     vulnerability lookups), `manifests` (paths read), `unplaced` ARG pins and
-    `unmatched` declared pins.
+    `unmatched` declared pins. `after` is the configuration's steps a move needs
+    once its own is made, which land on the records they name.
     """
     deps, installed, manifests, unplaced, unmatched = [], [], [], [], []
     files = repo.files()
@@ -689,7 +690,12 @@ def repository(repo, org, pins=()):
         unplaced = [u for u in unplaced if not (u["path"] == rec["sources"][0]["path"]
                                                 and u["line"] == rec["sources"][0]["line"])]
 
-    return {"dependencies": merge(deps), "installed": installed, "manifests": sorted(manifests),
+    deps = merge(deps)
+    for rule in after:
+        for d in deps:
+            if d["name"] == rule["name"] and d["scope"] not in ("indirect", "transitive"):
+                d["after"] = rule["steps"]
+    return {"dependencies": deps, "installed": installed, "manifests": sorted(manifests),
             "unplaced": unplaced, "unmatched": unmatched}
 
 

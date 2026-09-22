@@ -402,6 +402,7 @@ Each record in `dependencies` has this shape:
   "purl": "pkg:npm/react@18.3.1",    // the package URL of the pinned release, where a purl type fits
   "tier": "routine",                 // needing attention: the tier its own action sits in
   "how": "npm install react@18.3.2", // needing attention: the command or edit that makes its change
+  "after": [ { "run": "make viewer-build build", "cwd": "." } ],   // deps-config.json's steps after a move
   "fix_advisories": ["GO-2026-6180"], // advisories on the first fixed release, which `fix` steps past
   "in_build": true,                  // Go: whether the project's packages build this module
   "reachability": "not-in-build",    // Go: the closest the code comes to any advisory on it
@@ -768,7 +769,8 @@ https://codesweep.ai/dashboards/deps-actions.json
 - **A step is listed at every place the pin is written.** A command is listed once for every directory
   whose manifest declares the dependency. A Go pin gets one for every module file: `go mod edit` or
   `go get`, with `-modfile` naming a file other than `go.mod`. A place no command maintains, such as a
-  Containerfile `ARG`, gets an edit.
+  Containerfile `ARG` or a constant a configured pin reads, gets an edit. The configuration's `after`
+  steps come last.
 - **`go get` moves a tool by its command,** `-tool …/cmd/golangci-lint@v2.13.2`, which loads what the
   command imports. The module path would add a second tool line. Only `go.mod` is tidied: a module file
   beside it holds a tool's requirements, and tidy would add the directory's packages to it.
@@ -820,6 +822,12 @@ https://codesweep.ai/dashboards/deps-actions.json
     "project": "sandbox",
     "packages": "image/Containerfile.base",
     "built": { "path": "image/tiers.env", "match": "^AGENTS_REF=\\S+:v0\\.0\\.0-(\\d{14})-" }
+  } ],
+  "after": [ {
+    "project": "ledger",
+    "name": "@codesweep-ai/ui",
+    "steps": [ { "edit": "internal/ledger/render.go", "text": "raise RendererVersion, …" },
+               { "run": "make viewer-build build", "cwd": "." } ]
   } ]
 }
 ```
@@ -866,6 +874,9 @@ https://codesweep.ai/dashboards/deps-actions.json
 - **A snapshot says when a Containerfile's packages were resolved.** `packages` names the Containerfile.
   `built.match` finds a 14-digit build stamp in `built.path`, usually the tag of the image that
   Containerfile produced.
+- **`after` is what a move needs beyond its manifest.** Its steps follow the record's own in every action
+  that moves the dependency named, in that project: a bundle that embeds it rebuilt, a page that
+  reports its version re-rendered. Each step has the shape the actions file gives one.
 
 The configuration also carries three policies:
 

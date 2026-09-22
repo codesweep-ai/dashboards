@@ -6,6 +6,7 @@ add are laid over the records by hand, and each test asserts what an agent
 would run.
 """
 
+import json
 import os
 import unittest
 
@@ -13,12 +14,18 @@ from collector import actions, extract, gitrepo
 
 TESTDATA = os.path.join(os.path.dirname(__file__), "testdata")
 QUIET = {"status": "current", "level": "good"}
+with open(os.path.join(os.path.dirname(__file__), "..", "deps-config.json")) as fh:
+    CONFIG = json.load(fh)
 
 
 def fixture(name, facts):
-    """The project in testdata/<name>. `facts` maps a record's name to what resolving it would find."""
+    """The project in testdata/<name>, with this repository's configuration for the project of that name.
+
+    `facts` maps a record's name to what resolving it would find.
+    """
     repo = gitrepo.Repo(os.path.join(TESTDATA, name), f"https://github.com/codesweep-ai/{name}")
-    deps = extract.repository(repo, "codesweep-ai")["dependencies"]
+    deps = extract.repository(repo, "codesweep-ai", [p for p in CONFIG["pins"] if p["project"] == name],
+                              [a for a in CONFIG.get("after", []) if a["project"] == name])["dependencies"]
     for d in deps:
         d.update(facts.get(d["name"], QUIET))
     return {"name": name, "repo": {"url": repo.url, "sha": "abc", "branch": "main"}, "dependencies": deps}
@@ -82,6 +89,21 @@ class NpmProject(unittest.TestCase):
         # No build of the head yet: the step says what to wait for rather than naming a tag.
         (step,) = acts["npm-project:sync:ledger-npm-codesweep-ai-ledger"]["steps"]
         self.assertIn("a48d212425fe", step["do"])
+
+
+class Ledger(unittest.TestCase):
+    def test_the_ui_pin_edits_the_go_constant_and_rebuilds_and_re_renders_after(self):
+        built = "0.3.1-dev.20260922202805.27eb21f"
+        p = fixture("ledger", {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
+            "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": built}}})
+        act = document(p)["ledger:sync:ui-npm-codesweep-ai-ui"]
+        self.assertEqual(act["steps"][:2], [
+            {"run": f"npm install --save-exact @codesweep-ai/ui@{built}", "cwd": "viewer"},
+            {"edit": "internal/ledger/render.go", "line": 6, "text": f"set the version to {built}",
+             "from": "0.3.1-dev.20260909170256.1638d27", "to": built},
+        ])
+        self.assertEqual(act["steps"][2:], CONFIG["after"][0]["steps"])
+        self.assertNotIn("internal/ledger", [s.get("cwd") for s in act["steps"]])
 
 
 if __name__ == "__main__":

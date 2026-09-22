@@ -269,7 +269,8 @@ def main(argv=None):
                 project["repo"]["description"] = ((status or {}).get("repo") or {}).get("description") or ""
             except FetchError:
                 pass
-        found = extract.repository(repo, org, [p for p in pins if p["project"] == name])
+        found = extract.repository(repo, org, [p for p in pins if p["project"] == name],
+                                   [a for a in config.get("after", []) if a["project"] == name])
         deps = found["dependencies"]
         for u in found["unplaced"]:
             deps.append({"ecosystem": "native", "name": u["arg"], "version": u["version"], "scope": "build",
