@@ -57,6 +57,15 @@ class GoProject(unittest.TestCase):
             {"edit": "image/Containerfile.base", "line": 8, "text": "set the version to v0.50.0", "from": "v0.49.0", "to": "v0.50.0"},
         ])
 
+    def test_a_sibling_pin_moves_to_its_head_commit_and_nothing_else(self):
+        head = "a48d212425fe0a9d5822b3dcfe670b61dfa41045"
+        p = fixture("go-project", {"github.com/codesweep-ai/ledger": {
+            "status": "behind", "level": "info", "provider": "ledger",
+            "lag": {"commits": 12, "head": head, "pinned": "bbe29a48e449"}}})
+        act = document(p)["go-project:sync:ledger-go-github-com-codesweep-ai-ledger"]
+        self.assertEqual(act["steps"], [{"run": f"go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@{head} && go mod tidy",
+                                         "cwd": "."}])
+
 
 if __name__ == "__main__":
     unittest.main()

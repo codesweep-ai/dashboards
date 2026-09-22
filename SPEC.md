@@ -771,6 +771,8 @@ https://codesweep.ai/dashboards/deps-actions.json
 - **`go get` moves a tool by its command,** `-tool …/cmd/golangci-lint@v2.13.2`, which loads what the
   command imports. The module path would add a second tool line. Only `go.mod` is tidied: a module file
   beside it holds a tool's requirements, and tidy would add the directory's packages to it.
+- **A sibling pin moves to one commit, and no other pin moves with it.** A Go `sync` runs
+  `go get <module>@<lag.head>` in each module file that pins it, with the tool's command as above.
 - **`requires` orders the work.** An action comes after every action it requires, in the file as in time.
 - **`options` is a choice for a person.** The collector recommends one and picks none. An agent proposes
   the recommended option, and makes none of them unasked.

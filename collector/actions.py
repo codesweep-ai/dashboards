@@ -223,8 +223,10 @@ def steps_for(d, to=None):
         dirs = [cwd] if cwd is not None else _uniq(dir_of(s["path"]) for s in sources)
         return [{"run": cmd, "cwd": x} for x in dirs]
     if d.get("status") == "behind":
-        if d["ecosystem"] == "go":
-            return [{"run": "make repin", "cwd": "."}]
+        head = (d.get("lag") or {}).get("head")
+        if d["ecosystem"] == "go" and head:
+            # The commit itself, in this pin alone: a repin target moves every sibling to main.
+            return _each_place(d, sources, lambda s: _go_get(d, s, head), head)
         if d["ecosystem"] == "npm":
             tag = "dev" if d["name"] == "@codesweep-ai/ui" else "latest"
             return run(f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{tag}")
