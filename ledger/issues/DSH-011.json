@@ -1,0 +1,20 @@
+{
+  "id": "DSH-011",
+  "title": "An npm sync installs a dist-tag, which can move the pin backwards",
+  "type": "defect",
+  "severity": "high",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier1",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "An npm `sync` action emits `npm install --save-exact <package>@dev` for `@codesweep-ai/ui` and `@latest` for every other sibling. A tag moves, and the action means one version: the build of the commit in `lag.head`. On 2026-09-22 `@codesweep-ai/ledger@latest` was the build of 2026-09-15, older than the build of 2026-09-20 that ui pins, so `ui:sync:ledger-npm-codesweep-ai-ledger` run as printed moves the pin backwards. Through cs-npmrevs a tag other than `latest` answers npmjs.com's version rather than a campaign's.",
+  "notes": [],
+  "links": []
+}

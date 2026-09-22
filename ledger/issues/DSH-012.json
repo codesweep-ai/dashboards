@@ -1,0 +1,20 @@
+{
+  "id": "DSH-012",
+  "title": "ledger's ui sync runs npm where there is no package.json, and misses three steps",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier1",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "`ledger:sync:ui-npm-codesweep-ai-ui` emits `npm install --save-exact @codesweep-ai/ui@dev` in `viewer` and again in `internal/ledger`. The second directory holds no `package.json`, only the `UIVersion` string in `render.go` that a pin in `deps-config.json` reads, so the command would create one. The version string needs an edit, not a command.\n\nThe action also cannot be done without three steps no manifest states. `viewer/index.html`, the bundle `assets.go` embeds, has to be rebuilt. Both committed pages, `ledger/ledger.html` and `fixtures/sandbox/ledger/ledger.html`, have to be re-rendered. `RendererVersion` has to move, as ledger's CONTRIBUTING.md requires when the rendered output changes. pilot1 found all three the hard way.",
+  "notes": [],
+  "links": []
+}

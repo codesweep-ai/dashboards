@@ -1,0 +1,20 @@
+{
+  "id": "DSH-014",
+  "title": "An action met in full by another action in the same build is still listed as open",
+  "type": "defect",
+  "severity": "low",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier1",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "`tracer:lock:tracer-apps-viewer-package-lock-json` refreshes three vulnerable copies in `apps/viewer`: `@vitest/mocker` 2.1.9, `vite` 5.4.21 and `esbuild` 0.21.5. All three are installed only through `vitest` 2.1.9, which `tracer:dep:github-com-vitest-dev-vitest` moves to 4.1.11. In pilot2 that upgrade met every change of the lock action, with the vulnerable copies gone rather than shadowed, yet the page still listed the lock action as open. An agent following the file makes an empty commit or reports the action by hand.",
+  "notes": [],
+  "links": []
+}

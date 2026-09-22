@@ -1,0 +1,20 @@
+{
+  "id": "DSH-008",
+  "title": "A Go toolchain action moves go.mod and leaves every other file its change names",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier1",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "A `routine:runtime` action for the Go toolchain emits one step, `go mod edit -go=<version>`, while the change's own `files` name `go.golangci.mod` as well. Run as printed, it raises `go.mod` and leaves `go.golangci.mod` on the old floor, so the linter builds against it. The steps are built from the record's first source only.\n\nIn sandbox the same record also points at `ARG GO_VERSION` in `image/Containerfile.base`, and the action emits `go mod edit -go=1.27.1` with `cwd: image`, where no `go.mod` exists. It fails there, and the ARG and the checksums beside it never move.\n\nSeen in the report of 2026-09-22T05:24:19Z: `campaign`, `ledger`, `lint`, `npmrevs`, `tracer`, `vcr` and `sandbox:routine:runtime`.",
+  "notes": [],
+  "links": []
+}

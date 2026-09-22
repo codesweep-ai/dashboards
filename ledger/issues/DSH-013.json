@@ -1,0 +1,20 @@
+{
+  "id": "DSH-013",
+  "title": "A fix action's done_when names a version, and the registry moves under the plan",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier1",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "A vulnerable change's `done_when` reads `no advisory affects the pinned version: 3.1.6 or newer`. The number is stale by the time anyone runs the step. In pilot2, 8 of 10 rows of one `npm audit fix` landed above the version the report named, and fast-uri landed at 3.1.8 rather than 3.1.6, both correctly. A version is also the wrong test: a newer release can carry an advisory of its own. The condition that matters is that the lockfile no longer carries a copy the advisory affects. `npm audit fix` exits 0 whether or not it changed anything, so its exit code proves nothing either, and the file does not say so.",
+  "notes": [],
+  "links": []
+}

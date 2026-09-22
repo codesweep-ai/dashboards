@@ -1,0 +1,20 @@
+{
+  "id": "DSH-010",
+  "title": "A sibling Go sync tells an agent to run make repin, which moves every pin to main",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: the pilot2 orchestrator's findings (campaign-workspaces/deps-maintenance/pilot2/archives/deps-pilot2-20260922T203209Z/orchestrator/output/findings.md) and the step corrections pilot3's coordination.md section 5 carries",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier1",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "Every Go `sync` action emits `make repin` as its one step. That target moves every sibling pin at once, so it cannot make one action as one commit. It resolves `@latest`, so it cannot reach the commit the action names in `lag.head`. In a campaign it pins a sibling's base instead of its frozen commit, and pilot2's qa measured it pinning lint's base. The step that makes one action is `go get <module>@<lag.head>` followed by `go mod tidy`.",
+  "notes": [],
+  "links": []
+}
