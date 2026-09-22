@@ -1,0 +1,11 @@
+{
+  "name": "npm-project",
+  "private": true,
+  "dependencies": {
+    "@codesweep-ai/ui": "0.3.1-dev.20260909170256.1638d27"
+  },
+  "devDependencies": {
+    "@codesweep-ai/ledger": "0.0.0-20260920230337-e974225af350",
+    "vitest": "^2.1.9"
+  }
+}

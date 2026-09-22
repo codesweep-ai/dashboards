@@ -130,7 +130,16 @@ class Resolver:
             return
         if dep.get("internal") and version and versions.pseudo(version):
             repo = _repo_from_url(latest.get("repository"), self.org) or _guess_repo(name)
-            return self._internal_commit(dep, repo, version)
+            self._internal_commit(dep, repo, version)
+            lag = dep.get("lag") or {}
+            if lag.get("commits"):
+                # The version to install is the one built from the head commit. A
+                # dist-tag names whichever build was tagged last, which can be older.
+                built = [v for v in self.src.npm_versions(name) or []
+                         if versions.pseudo(v) and lag["head"].startswith(versions.pseudo(v)[1])]
+                if built:
+                    lag["version"] = built[-1]
+            return
         info = self.src.npm_version(name, version) if version else {}
         top = self.src.npm_version(name, latest["version"]) if latest["version"] else {}
         self._set_upstream(dep, latest=latest["version"], latest_date=top.get("published"),

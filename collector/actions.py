@@ -78,7 +78,7 @@ def target(d):
     """The version a record's newest release, or its fix, names."""
     up = d.get("upstream") or {}
     if (d.get("lag") or {}).get("head"):
-        return d["lag"]["head"][:7]
+        return d["lag"].get("version") or d["lag"]["head"][:7]
     if d.get("status") == "vulnerable" and d.get("fix") and not up.get("latest"):
         return d["fix"]
     return up.get("latest") or d.get("fix")
@@ -227,9 +227,12 @@ def steps_for(d, to=None):
         if d["ecosystem"] == "go" and head:
             # The commit itself, in this pin alone: a repin target moves every sibling to main.
             return _each_place(d, sources, lambda s: _go_get(d, s, head), head)
-        if d["ecosystem"] == "npm":
-            tag = "dev" if d["name"] == "@codesweep-ai/ui" else "latest"
-            return run(f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{tag}")
+        if d["ecosystem"] == "npm" and head:
+            built = d["lag"].get("version")
+            if not built:
+                return [{"do": f"Install the build of {d['name']} made from commit {head[:12]} once the registry holds it: "
+                               f"`npm view {d['name']} versions --json` lists them."}]
+            return run(f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{built}")
         if d["ecosystem"] == "actions":
             head = (d.get("lag") or {}).get("head")
             return edit(f"uses: {d['name']}@{head or '<newest commit>'}", **{"from": (d.get("lag") or {}).get("pinned"), "to": head})

@@ -67,5 +67,22 @@ class GoProject(unittest.TestCase):
                                          "cwd": "."}])
 
 
+class NpmProject(unittest.TestCase):
+    def test_a_sibling_pin_installs_the_build_of_its_head_commit_not_a_tag(self):
+        p = fixture("npm-project", {
+            "@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
+                "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": "0.3.1-dev.20260922202805.27eb21f"}},
+            "@codesweep-ai/ledger": {"status": "behind", "level": "info", "provider": "ledger", "lag": {
+                "commits": 4, "head": "a48d212425fe0a9d5822b3dcfe670b61dfa41045"}},
+        })
+        acts = document(p)
+        ui = acts["npm-project:sync:ui-npm-codesweep-ai-ui"]
+        self.assertEqual(ui["steps"], [{"run": "npm install --save-exact @codesweep-ai/ui@0.3.1-dev.20260922202805.27eb21f", "cwd": "."}])
+        self.assertEqual(ui["changes"][0]["to"], "0.3.1-dev.20260922202805.27eb21f")
+        # No build of the head yet: the step says what to wait for rather than naming a tag.
+        (step,) = acts["npm-project:sync:ledger-npm-codesweep-ai-ledger"]["steps"]
+        self.assertIn("a48d212425fe", step["do"])
+
+
 if __name__ == "__main__":
     unittest.main()

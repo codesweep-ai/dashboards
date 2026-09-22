@@ -379,6 +379,7 @@ Each record in `dependencies` has this shape:
   "lag": { "commits": 8, "commits_touching": 1, "paths": ["action"], "days": 0.5,
            "head": "d687ad5b27750000…",   // the whole commit the sibling's default branch is at
            "pinned": "4c204c69b8b2",
+           "version": "0.3.1-dev.20260922202805.27eb21f",   // npm: the registry's build of that commit
            "builds": 3,                   // an image: newer tier builds, in place of commits
            "off_branch": true },          // the pinned commit is not on the default branch
   "provider": "dashboards",          // internal: the project pinned
@@ -772,7 +773,10 @@ https://codesweep.ai/dashboards/deps-actions.json
   command imports. The module path would add a second tool line. Only `go.mod` is tidied: a module file
   beside it holds a tool's requirements, and tidy would add the directory's packages to it.
 - **A sibling pin moves to one commit, and no other pin moves with it.** A Go `sync` runs
-  `go get <module>@<lag.head>` in each module file that pins it, with the tool's command as above.
+  `go get <module>@<lag.head>` in each module file that pins it, with the tool's command as above. An
+  npm `sync` installs `lag.version`, the build the registry holds of that commit. A dist-tag names
+  whichever build was tagged last, which can be older than the pin. Until the registry holds the build,
+  the step says so instead.
 - **`requires` orders the work.** An action comes after every action it requires, in the file as in time.
 - **`options` is a choice for a person.** The collector recommends one and picks none. An agent proposes
   the recommended option, and makes none of them unasked.

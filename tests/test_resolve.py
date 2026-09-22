@@ -135,6 +135,17 @@ class Resolve(unittest.TestCase):
         self.assertEqual((d["provider"], d["lag"]["commits"], d["lag"]["pinned"]), ("ledger", 8, "bda511aea589"))
         self.assertGreater(d["lag"]["days"], 10)
 
+    def test_an_internal_npm_pin_names_the_build_of_the_head_commit(self):
+        # latest names an older build than the pin; the build of the head is the one to install.
+        src = FakeSources(npm_latest={"version": "0.0.0-20260901000000-129b17f78d58",
+                                      "repository": "git+https://github.com/codesweep-ai/ledger.git"},
+                          npm_versions=["0.0.0-20260901000000-129b17f78d58", "0.0.0-20260905000000-bda511aea589",
+                                        "0.0.0-20260912000000-d687ad5b2775"])
+        d = resolver(src, {"ledger": FakeRepo(behind=8)}).resolve(dep(
+            ecosystem="npm", name="@codesweep-ai/ledger", package="@codesweep-ai/ledger", scope="dev",
+            version="0.0.0-20260905000000-bda511aea589", internal=True, datasource="npm"))
+        self.assertEqual(d["lag"]["version"], "0.0.0-20260912000000-d687ad5b2775")
+
     def test_a_fork_compares_a_sibling_pin_in_its_own_clone(self):
         # A fork keeps the org's module path, so the pin is still internal. Its lag
         # and its compare link come from the clone the run read, which is the fork's.

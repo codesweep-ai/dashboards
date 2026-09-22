@@ -132,6 +132,12 @@ class Sources:
                               headers={"Accept": "application/vnd.npm.install-v1+json"}, accept_missing=True)
         return (data or {}).get("dist-tags", {})
 
+    def npm_versions(self, name):
+        """Every version the registry holds, from the same document as the dist-tags."""
+        data = self.http.json(f"{NPM}/{_enc(name)}",
+                              headers={"Accept": "application/vnd.npm.install-v1+json"}, accept_missing=True)
+        return list((data or {}).get("versions", {}))
+
     def npm_version(self, name, version):
         """publishedAt and deprecation for one version, from deps.dev."""
         # The same URL depsdev_versions asks, so the run's cache answers the second time.
