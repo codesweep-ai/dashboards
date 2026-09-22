@@ -24,8 +24,9 @@ def fixture(name, facts):
     `facts` maps a record's name to what resolving it would find.
     """
     repo = gitrepo.Repo(os.path.join(TESTDATA, name), f"https://github.com/codesweep-ai/{name}")
-    deps = extract.repository(repo, "codesweep-ai", [p for p in CONFIG["pins"] if p["project"] == name],
-                              [a for a in CONFIG.get("after", []) if a["project"] == name])["dependencies"]
+    found = extract.repository(repo, "codesweep-ai", [p for p in CONFIG["pins"] if p["project"] == name],
+                               [a for a in CONFIG.get("after", []) if a["project"] == name])
+    deps = found["dependencies"] + extract.lockfile_records(found["dependencies"], found["installed"], "codesweep-ai")
     for d in deps:
         d.update(facts.get(d["name"], QUIET))
     return {"name": name, "repo": {"url": repo.url, "sha": "abc", "branch": "main"}, "dependencies": deps}
@@ -73,6 +74,13 @@ class GoProject(unittest.TestCase):
         self.assertEqual(act["steps"], [{"run": f"go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@{head} && go mod tidy",
                                          "cwd": "."}])
 
+    def test_a_vulnerable_module_is_done_when_no_module_file_requires_an_affected_version(self):
+        p = fixture("go-project", {"golang.org/x/tools": {
+            "status": "vulnerable", "level": "serious", "fix": "v0.50.0", "upstream": {"latest": "v0.50.0"},
+            "vulnerabilities": [{"id": "GO-2026-0001", "severity": "high", "fixed": "0.50.0"}]}})
+        (change,) = [c for a in document(p).values() for c in a["changes"] if c["name"] == "golang.org/x/tools"]
+        self.assertEqual(change["done_when"], "go.golangci.mod and go.mod require no version of golang.org/x/tools that GO-2026-0001 affects")
+
 
 class NpmProject(unittest.TestCase):
     def test_a_sibling_pin_installs_the_build_of_its_head_commit_not_a_tag(self):
@@ -89,6 +97,22 @@ class NpmProject(unittest.TestCase):
         # No build of the head yet: the step says what to wait for rather than naming a tag.
         (step,) = acts["npm-project:sync:ledger-npm-codesweep-ai-ledger"]["steps"]
         self.assertIn("a48d212425fe", step["do"])
+
+    def test_a_fix_is_done_when_the_lockfile_carries_no_affected_copy_whatever_its_version(self):
+        p = fixture("npm-project", {
+            "fast-uri": {"status": "vulnerable", "level": "serious", "fix": "3.1.6",
+                         "vulnerabilities": [{"id": "GHSA-aaaa-bbbb-cccc", "severity": "high", "fixed": "3.1.6"}]},
+            "vitest": {"status": "vulnerable", "level": "serious", "fix": "4.1.11", "upstream": {"latest": "4.1.11"},
+                       "vulnerabilities": [{"id": "GHSA-dddd-eeee-ffff", "severity": "critical", "fixed": "2.1.10"},
+                                           {"id": "GHSA-gggg-hhhh-iiii", "severity": "moderate", "fixed": "4.1.11"}]},
+        })
+        acts = document(p)
+        (lock,) = acts["npm-project:lock:npm-project-package-lock-json"]["changes"]
+        self.assertEqual(lock["done_when"], "package-lock.json carries no copy of fast-uri that GHSA-aaaa-bbbb-cccc affects")
+        (vitest,) = acts["npm-project:dep:npm-vitest"]["changes"]
+        self.assertEqual(vitest["done_when"],
+                         "package-lock.json carries no copy of vitest that GHSA-dddd-eeee-ffff or GHSA-gggg-hhhh-iiii affects")
+        self.assertEqual(acts["npm-project:lock:npm-project-package-lock-json"]["tier"], "fix")
 
 
 class Ledger(unittest.TestCase):

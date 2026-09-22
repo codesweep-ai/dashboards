@@ -762,6 +762,8 @@ def agent_document(data, site, spec_url, repository=None):
             "Follow each step: run a command in its cwd, make an edit at its file and line, or do the task it names.",
             "Run the project's own gate before committing, as its AGENTS.md or CONTRIBUTING.md describes.",
             "An action is done when every change meets its done_when. The next build of this file drops it.",
+            "A step's exit status is not its check: npm audit fix exits 0 whether or not it changed anything. "
+            "Read each done_when in the files the steps leave.",
             f"When a change cannot be made, say why, and propose the decline entry for deps-config.json in {repository}.",
         ],
         "tiers": {"fix": "act now: a vulnerability, an end of life, or a fix-by date already passed",
@@ -810,7 +812,7 @@ def _done_when(d, it):
         return (f"on a line {compat['with']} validates" + (f" ({target['line']})" if target else "") +
                 (f", with {compat['with']} {fc['needs']}+" if fc and not fc.get("ok") else ""))
     if status == "vulnerable":
-        return f"no advisory affects the pinned version" + (f": {d['fix']} or newer" if d.get("fix") else "")
+        return _cleared(d)
     if status in ("eol", "eol-soon"):
         return "the pinned release line is supported past 90 days from now"
     if status == "behind":
@@ -822,6 +824,31 @@ def _done_when(d, it):
     if status == "deprecated":
         return "the dependency is gone, or a release its publisher has not deprecated is pinned"
     return "the next build no longer lists this change"
+
+
+def _cleared(d):
+    """A vulnerable change is done when no copy the advisories affect is left, whatever version gets there.
+
+    The registry moves between this file and the step, so a version would be
+    stale: the refresh that lands above it is right, and a later release can
+    carry an advisory of its own.
+    """
+    ids = _uniq(v["id"] for v in d.get("vulnerabilities") or [])
+    if not ids:
+        return "no advisory affects the pinned version"
+    named = ids[0] if len(ids) == 1 else ", ".join(ids[:-1]) + " or " + ids[-1]
+    path = src_path(d)
+    if d["ecosystem"] == "npm":
+        lock = d.get("lockfile") or (path if path.endswith("package-lock.json") else None)
+        if lock:
+            return f"{lock} carries no copy of {d['name']} that {named} affects"
+    if d["ecosystem"] == "go":
+        files = _uniq(s["path"] for s in d.get("sources") or [] if GO_MODFILE.search(s["path"]))
+        if files:
+            return f"{' and '.join(files)} require{'s' if len(files) == 1 else ''} no version of {d['name']} that {named} affects"
+    if d["ecosystem"] == "package":
+        return f"the image {path} describes installs no build of {d['name']} that {named} affects"
+    return f"{path} pins no version of {d['name']} that {named} affects"
 
 
 def _decline(p, a, repository):

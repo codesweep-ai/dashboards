@@ -699,6 +699,25 @@ def repository(repo, org, pins=(), after=()):
             "unplaced": unplaced, "unmatched": unmatched}
 
 
+def lockfile_records(deps, installed, org):
+    """A record for every package a lockfile installs that no manifest names.
+
+    The inventory is then complete. resolve.py reads only their newest versions.
+    """
+    seen = {(d["name"], d.get("version")) for d in deps if d["ecosystem"] == "npm"}
+    out = []
+    for inst in installed:
+        key = (inst["name"], inst["version"])
+        if inst["direct"] or key in seen:
+            continue
+        seen.add(key)
+        out.append({"ecosystem": "npm", "name": inst["name"], "version": inst["version"], "scope": "transitive",
+                    "internal": inst["name"].startswith(f"@{org}/"), "dev": inst["dev"],
+                    "sources": [{"path": inst["lockfile"], "line": None}], "datasource": "npm",
+                    "package": inst["name"]})
+    return out
+
+
 _SCOPE_RANK = {"direct": 0, "tool": 1, "build": 2, "toolchain": 3, "dev": 4, "ci": 5, "deploy": 6,
                "engines": 7, "optional": 8, "vendored": 2, "indirect": 9, "transitive": 10}
 

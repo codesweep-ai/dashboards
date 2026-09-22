@@ -276,18 +276,7 @@ def main(argv=None):
             deps.append({"ecosystem": "native", "name": u["arg"], "version": u["version"], "scope": "build",
                          "internal": False, "sources": [{"path": u["path"], "line": u["line"]}],
                          "error": "no upstream recognised for this pin; declare one in deps-config.json"})
-        # Every package a lockfile installs gets a record of its own, so the
-        # inventory is complete; resolve.py reads only their newest versions.
-        seen = {(d["name"], d.get("version")) for d in deps if d["ecosystem"] == "npm"}
-        for inst in found["installed"]:
-            key = (inst["name"], inst["version"])
-            if inst["direct"] or key in seen:
-                continue
-            seen.add(key)
-            deps.append({"ecosystem": "npm", "name": inst["name"], "version": inst["version"], "scope": "transitive",
-                         "internal": inst["name"].startswith(f"@{org}/"), "dev": inst["dev"],
-                         "sources": [{"path": inst["lockfile"], "line": None}], "datasource": "npm",
-                         "package": inst["name"]})
+        deps += extract.lockfile_records(deps, found["installed"], org)
         project.update(dependencies=deps, installed=found["installed"], manifests=found["manifests"],
                        unmatched=found["unmatched"])
         projects.append(project)

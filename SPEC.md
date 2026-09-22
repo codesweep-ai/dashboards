@@ -751,7 +751,7 @@ https://codesweep.ai/dashboards/deps-actions.json
         "lifecycle": { "product": "…", "cycle": "…", "eol": "…", "phase": "…", "url": "…" },
         "compat": { /* the record's */ }, "lag": { /* the record's */ },
         "signals": [ /* the record's, for an abandoned package */ ],
-        "done_when": "no advisory affects the pinned version: 4.1.11 or newer"
+        "done_when": "apps/viewer/package-lock.json carries no copy of vitest that GHSA-… affects"
       } ],
       "page": "https://codesweep.ai/dashboards/deps?project=tracer#action-…",
       "decline": { "file": "deps-config.json", "repo": "codesweep-ai/dashboards",  // the repository that built this file
@@ -786,6 +786,11 @@ https://codesweep.ai/dashboards/deps-actions.json
   what groups its items. A commit or pull request can name it, and the next file shows whether it is gone.
 - **`done_when` says what the collector will see** once a change is made. An action is done when every
   change meets its condition, and the next build of the file drops it.
+- **A vulnerable change is done when no affected copy is left, at whatever version.** Its condition names
+  the lockfile, the module files or the pin, and the advisories, and never a version. The registry moves
+  between this file and the step, so a refresh can rightly land above `to`, and a newer release can carry
+  an advisory of its own. A step's exit status proves nothing either: `npm audit fix` exits 0 whether or
+  not it changed anything.
 - **`decline` is the entry that leaves a finding be.** It goes in `accepted` in this repository's
   `deps-config.json`, with a real reason, note and expiry in place of the placeholders.
 - **The file is rewritten on every build**, on each push and once a day. An agent reads it fresh before it
