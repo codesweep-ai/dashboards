@@ -345,6 +345,7 @@ Each record in `dependencies` has this shape:
   "dev": true,                       // npm: installed only for development, by the lockfile's reckoning
   "floating": false,                 // names a line rather than a release: `v7`, `24`, a dnf package
   "sources": [ { "path": "internal/fcdisk/build.go", "line": 73 } ],   // every place it is declared
+  // A source folded in from a Containerfile ARG names it: { "path": "…", "line": 3, "arg": "GO_VERSION" }
   "datasource": "github",            // where its upstream is read: github, npm, goproxy, pypi, golang, node,
                                      // python, temurin, maven, oci, runner, rpm or fedora-kernel
   "package": "firecracker-microvm/firecracker",   // its name at that datasource, when it differs
@@ -762,8 +763,10 @@ https://codesweep.ai/dashboards/deps-actions.json
 - **A step is one of three things.** `run` is a command to run in `cwd`, relative to the repository root.
   `edit` is a change at a file and line, described by `text`, with `from` and `to` where the collector
   knows both. `do` is a task no command makes, such as rebuilding an image.
-- **An edit is listed at every place the pin is written.** A command is listed once for every directory
-  whose manifest declares the dependency.
+- **A step is listed at every place the pin is written.** A command is listed once for every directory
+  whose manifest declares the dependency. A Go pin gets one for every module file: `go mod edit` or
+  `go get`, with `-modfile` naming a file other than `go.mod`. A place no command maintains, such as a
+  Containerfile `ARG`, gets an edit.
 - **`requires` orders the work.** An action comes after every action it requires, in the file as in time.
 - **`options` is a choice for a person.** The collector recommends one and picks none. An agent proposes
   the recommended option, and makes none of them unasked.

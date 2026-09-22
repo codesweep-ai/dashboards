@@ -694,7 +694,8 @@ def merge(deps):
     """Fold records naming the same dependency at the same version into one.
 
     The sources are kept, so a runner label used by twelve jobs is one record
-    that points at all twelve lines. The most direct scope wins.
+    that points at all twelve lines. The most direct scope wins. Go's `go 1.27.0`
+    in go.mod and a Containerfile's `ARG GO_VERSION=1.27.0` are one record too.
     """
     out = {}
     for d in deps:
@@ -704,6 +705,10 @@ def merge(deps):
             out[key] = d
             continue
         for s in d["sources"]:
+            # The record keeps the first one's fields, so a folded Containerfile
+            # ARG names itself at its own line.
+            if d.get("arg") and d["arg"] != cur.get("arg"):
+                s = dict(s, arg=d["arg"])
             if s not in cur["sources"]:
                 cur["sources"].append(s)
         if _SCOPE_RANK.get(d["scope"], 99) < _SCOPE_RANK.get(cur["scope"], 99):

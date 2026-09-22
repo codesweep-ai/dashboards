@@ -167,6 +167,32 @@ def action_key(p, d):
 
 # --- steps: the edit or command that makes one record's change -------------------------
 
+GO_MODFILE = re.compile(r"(^|/)go(\.[\w-]+)?\.mod$")
+
+
+def _modfile_flag(path):
+    """`-modfile=go.golangci.mod ` for a module file other than go.mod: go's commands read go.mod unless told."""
+    base = path.rsplit("/", 1)[-1]
+    return "" if base == "go.mod" else f"-modfile={base} "
+
+
+def _set_at(d, s, v):
+    """The edit that sets a version where no command maintains it, such as a Containerfile ARG."""
+    what = s.get("arg") or d.get("arg")
+    return {"edit": s["path"], "line": s.get("line"),
+            "text": f"set {what or 'the version'} to {v}" + (", with any checksum beside it" if what else ""),
+            "from": d.get("version"), "to": v}
+
+
+def _each_place(d, sources, in_modfile, v):
+    """A step for every place a Go pin is written: `in_modfile(source)` in a module file, an edit anywhere else."""
+    steps = []
+    for s in sources:
+        step = in_modfile(s) if GO_MODFILE.search(s["path"]) else _set_at(d, s, v)
+        if step not in steps:
+            steps.append(step)
+    return steps
+
 
 def steps_for(d, to=None):
     """What makes one record's change, as structured steps: a command to run, an edit to make, or a task to do."""
@@ -195,6 +221,10 @@ def steps_for(d, to=None):
             return edit(f"{d.get('variable') or 'the image reference'}={t or '<newest tag>'}", **{"from": d.get("version"), "to": t})
     if d.get("scope") == "engines":
         return edit("raise engines.node", **{"from": d.get("constraint") or d.get("version")})
+    if d["ecosystem"] == "runtime" and d["name"] == "go" and t and any(GO_MODFILE.search(s["path"]) for s in sources):
+        directive = f"-toolchain=go{t}" if d.get("scope") == "toolchain" else f"-go={t}"
+        return _each_place(d, sources, lambda s: {"run": f"go mod edit {_modfile_flag(s['path'])}{directive}",
+                                                  "cwd": dir_of(s["path"])}, t)
     compat = d.get("compat") or {}
     if compat and not compat.get("ok"):
         return compat_steps(d, compat, edit)
@@ -207,8 +237,6 @@ def steps_for(d, to=None):
         if re.search(r"go\.[\w-]+\.mod$", path) and path != "go.mod" and not path.endswith("/go.mod"):
             return run(f"go get -modfile={path.rsplit('/', 1)[-1]} -tool {d['name']}@{version}", dir_of(path))
         return run(f"go get {'-tool ' if d.get('scope') == 'tool' else ''}{d['name']}@{version} && go mod tidy")
-    if d["ecosystem"] == "runtime" and d["name"] == "go" and re.search(r"go(\.[\w-]+)?\.mod$", path) and t:
-        return run(f"go mod edit -go={t}")
     if d["ecosystem"] == "npm" and t:
         version = d["fix"] if d.get("fix") and d.get("status") == "vulnerable" else t
         return run(f"npm install {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{version}")

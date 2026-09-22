@@ -1,0 +1,8 @@
+FROM registry.fedoraproject.org/fedora:44
+
+ARG GO_VERSION=1.27.0
+ARG GO_SHA256_AMD64=675c26c449cbb18fc24b74650de1eabbae6e16f64326fd85a283fb3b58280685
+RUN curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+  && tar -xzf /tmp/go.tar.gz -C /opt
+
+RUN GOBIN=/usr/local/bin /opt/go/bin/go install golang.org/x/tools/cmd/deadcode@v0.49.0
