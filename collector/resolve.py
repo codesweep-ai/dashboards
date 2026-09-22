@@ -674,6 +674,34 @@ class Resolver:
                 d["fix_advisories"] = sorted(hits[k])
                 d["clean_fix"] = clean[2] if clean else None
 
+    def cleared_by_moves(self, projects):
+        """Name the declared dependencies whose own move drops a vulnerable lockfile copy.
+
+        Runs once records are classified, since it reads where each declared
+        dependency moves. A copy is cleared when every declared dependency that
+        installs it moves, and what deps.dev resolves for each at its new version
+        asks for no affected copy: none at all, or only fixed releases under a
+        range the pinned copy does not satisfy, so npm cannot keep it.
+        """
+        graphs = {}
+        for p in projects:
+            direct = {(d["name"], d.get("lockfile")): d for d in p["dependencies"]
+                      if d["ecosystem"] == "npm" and d.get("lockfile") and d["scope"] not in ("indirect", "transitive")}
+            for r in p["dependencies"]:
+                if r.get("scope") != "transitive" or r.get("status") != "vulnerable" or not r.get("via") or not r.get("fix"):
+                    continue
+                moves = []
+                for name in r["via"]:
+                    to = _planned_move(direct.get((name, r["sources"][0]["path"])))
+                    if to and (name, to) not in graphs:
+                        graphs[(name, to)] = self.src.npm_graph(name, to)
+                    if not to or not _drops(graphs[(name, to)], r):
+                        moves = None
+                        break
+                    moves.append({"name": name, "version": to})
+                if moves:
+                    r["cleared_by"] = moves
+
     def enrich_found_licenses(self, projects, shipped):
         """The licenses ClearlyDefined's scans found in each shipped package's files, and its license score."""
         coords = {}
@@ -1139,6 +1167,32 @@ def attention(dep):
     if dep.get("scope") in ("indirect", "transitive"):
         return dep.get("status") == "vulnerable"
     return level_rank(dep.get("level")) >= level_rank("info")
+
+
+def _planned_move(d):
+    """The version a declared record's own action moves it to, when the record is work at all."""
+    if not d or (d.get("accepted") and not d["accepted"].get("lapsed")) or not attention(d):
+        return None
+    if d.get("status") == "vulnerable":
+        return d.get("fix")
+    if d.get("status") in ("major", "minor", "patch"):
+        return (d.get("upstream") or {}).get("latest")
+    return None
+
+
+def _drops(graph, r):
+    """Whether a resolved graph leaves no copy of r's package that r's fix does not reach."""
+    if graph is None:
+        return False
+    fixed = versions.parse(r["fix"])
+    for version, asked in (graph.get(r["name"]) or {}).items():
+        got = versions.parse(version)
+        if fixed is None or got is None or got < fixed:
+            return False
+        # npm keeps the copy it has when that copy satisfies the range.
+        if any(versions.satisfies(r["version"], q) is not False for q in asked):
+            return False
+    return True
 
 
 def lag_days(dep):

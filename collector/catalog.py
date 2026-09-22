@@ -75,7 +75,8 @@ CATALOG = [
 
     # --- packages and licenses -------------------------------------------------------
     {"id": "depsdev", "group": "licenses", "name": "deps.dev", "url": "https://deps.dev",
-     "gives": "Each version's licenses, publish date, deprecation, provenance and repository, and each repository's OpenSSF Scorecard",
+     "gives": "Each version's licenses, publish date, deprecation, provenance and repository, each repository's OpenSSF Scorecard, "
+              "and what installing an npm version brings in",
      "license": "CC-BY-4.0", "hosts": ["api.deps.dev"]},
     {"id": "clearlydefined", "group": "licenses", "name": "ClearlyDefined", "url": "https://clearlydefined.io",
      "gives": "The licenses scans found in each shipped package's files, and a license score",

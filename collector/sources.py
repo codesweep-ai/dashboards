@@ -138,6 +138,25 @@ class Sources:
                               headers={"Accept": "application/vnd.npm.install-v1+json"}, accept_missing=True)
         return list((data or {}).get("versions", {}))
 
+    def npm_graph(self, name, version):
+        """What installing one npm version brings in, as deps.dev resolves it.
+
+        Returns {package: {version: [the ranges that asked for it]}}, or None
+        when deps.dev does not know the version.
+        """
+        data = self.http.json(f"{DEPSDEV}/systems/NPM/packages/{_enc(name)}/versions/{_enc(version)}:dependencies",
+                              accept_missing=True)
+        if not data or not data.get("nodes"):
+            return None
+        keys = [n["versionKey"] for n in data["nodes"]]
+        out = {}
+        for k in keys:
+            out.setdefault(k["name"], {}).setdefault(k["version"], [])
+        for e in data.get("edges") or []:
+            k = keys[e["toNode"]]
+            out[k["name"]][k["version"]].append(e.get("requirement"))
+        return out
+
     def npm_version(self, name, version):
         """publishedAt and deprecation for one version, from deps.dev."""
         # The same URL depsdev_versions asks, so the run's cache answers the second time.

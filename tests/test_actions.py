@@ -10,7 +10,7 @@ import json
 import os
 import unittest
 
-from collector import actions, extract, gitrepo
+from collector import actions, extract, gitrepo, resolve
 
 TESTDATA = os.path.join(os.path.dirname(__file__), "testdata")
 QUIET = {"status": "current", "level": "good"}
@@ -113,6 +113,50 @@ class NpmProject(unittest.TestCase):
         self.assertEqual(vitest["done_when"],
                          "package-lock.json carries no copy of vitest that GHSA-dddd-eeee-ffff or GHSA-gggg-hhhh-iiii affects")
         self.assertEqual(acts["npm-project:lock:npm-project-package-lock-json"]["tier"], "fix")
+
+    VITEST = {
+        "vitest": {"status": "vulnerable", "level": "serious", "fix": "4.1.11", "upstream": {"latest": "4.1.11"},
+                   "vulnerabilities": [{"id": "GHSA-dddd-eeee-ffff", "severity": "critical", "fixed": "4.1.11"}]},
+        "@vitest/mocker": {"status": "vulnerable", "level": "serious", "fix": "4.1.11",
+                           "vulnerabilities": [{"id": "GHSA-dddd-eeee-ffff", "severity": "critical", "fixed": "4.1.11"}]},
+        "vite": {"status": "vulnerable", "level": "serious", "fix": "6.4.3",
+                 "vulnerabilities": [{"id": "GHSA-jjjj-kkkk-llll", "severity": "high", "fixed": "6.4.3"}]},
+        "esbuild": {"status": "vulnerable", "level": "warning", "fix": "0.25.0",
+                    "vulnerabilities": [{"id": "GHSA-mmmm-nnnn-oooo", "severity": "moderate", "fixed": "0.25.0"}]},
+    }
+    # What deps.dev resolves for vitest 4.1.11: its mocker in lockstep, a vite 5.4.21 cannot satisfy, and no esbuild.
+    GRAPH = {"vitest": {"4.1.11": []}, "@vitest/mocker": {"4.1.11": ["4.1.11"]}, "vite": {"8.3.0": ["^6.0.0 || ^7.0.0 || ^8.0.0"]}}
+
+    def cleared(self, facts, graph):
+        p = fixture("npm-project", facts)
+
+        class Graphs:
+            def npm_graph(self, name, version):
+                return graph if (name, version) == ("vitest", "4.1.11") else None
+        resolve.Resolver(Graphs(), "codesweep-ai", {}, None).cleared_by_moves([p])
+        return document(p)
+
+    def test_a_refresh_the_upgrade_clears_in_full_is_not_listed(self):
+        acts = self.cleared(self.VITEST, self.GRAPH)
+        self.assertEqual(list(acts), ["npm-project:dep:npm-vitest"])
+        act = acts["npm-project:dep:npm-vitest"]
+        self.assertEqual((act["title"], act["steps"]), ("Upgrade vitest to 4.1.11 in npm-project",
+                                                        [{"run": "npm install -D vitest@4.1.11", "cwd": "."}]))
+        self.assertEqual([(c["name"], c.get("cleared_by")) for c in act["changes"]],
+                         [("vitest", None), ("@vitest/mocker", ["vitest"]), ("vite", ["vitest"]), ("esbuild", ["vitest"])])
+        self.assertEqual(act["result"], "Fixes 3 advisories")
+
+    def test_a_copy_something_else_installs_keeps_its_refresh(self):
+        facts = dict(self.VITEST, **{"fast-uri": {"status": "vulnerable", "level": "serious", "fix": "3.1.6",
+                                                  "vulnerabilities": [{"id": "GHSA-aaaa-bbbb-cccc", "severity": "high", "fixed": "3.1.6"}]}})
+        lock = self.cleared(facts, self.GRAPH)["npm-project:lock:npm-project-package-lock-json"]
+        self.assertEqual([c["name"] for c in lock["changes"]], ["fast-uri"])
+
+    def test_a_copy_npm_could_keep_is_not_cleared(self):
+        # vite 5.4.21 satisfies ^5.0.0, so npm may keep it however new a vite deps.dev picks.
+        graph = dict(self.GRAPH, vite={"6.4.3": ["^5.0.0 || ^6.0.0"]})
+        lock = self.cleared(self.VITEST, graph)["npm-project:lock:npm-project-package-lock-json"]
+        self.assertEqual([c["name"] for c in lock["changes"]], ["vite"])
 
 
 class Ledger(unittest.TestCase):

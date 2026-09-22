@@ -415,10 +415,43 @@ def build(projects):
             continue
         if a not in out:
             out.append(a)
+    fold_cleared(out)
     out = [describe(a) for a in out if a["items"]]
     link_prerequisites(out)
     out.sort(key=_sort_key)
     return out
+
+
+def fold_cleared(groups):
+    """Move a lockfile item into the upgrade that clears it, so a refresh with nothing left to do is not listed.
+
+    resolve.py names, in a record's `cleared_by`, the declared dependencies
+    whose move drops every affected copy, and the version it read each at. The
+    item joins the one action that makes every one of those moves, at those
+    versions, and keeps its advisories and its done_when there.
+    """
+    for g in groups:
+        if not g["key"].startswith("lock|"):
+            continue
+        for it in list(g["items"]):
+            wanted = it["dep"].get("cleared_by") or []
+            homes = [_mover(groups, it, m) for m in wanted]
+            if not homes or None in homes or any(h is not homes[0] for h in homes):
+                continue
+            g["items"].remove(it)
+            homes[0]["items"].append(dict(it, cleared_by=[m["name"] for m in wanted]))
+            homes[0]["tier"] = min(homes[0]["tier"], it["tier"], key=TIERS.index)
+
+
+def _mover(groups, it, m):
+    """The upgrade action that moves `m["name"]` to `m["version"]` in the lockfile `it` sits in."""
+    for h in groups:
+        if h["key"].startswith("dep|") and any(
+                x["project"] is it["project"] and not x["reason"] and not x.get("cleared_by")
+                and x["dep"]["name"] == m["name"] and x["dep"].get("lockfile") == src_path(it["dep"])
+                and move_to(x["dep"], h["items"]) == m["version"] for x in h["items"]):
+            return h
+    return None
 
 
 def link_prerequisites(actions):
@@ -455,7 +488,9 @@ def _sort_key(a):
 
 def describe(a):
     items = a["items"]
-    items.sort(key=lambda it: (-level_rank(it["dep"].get("level")), it["project"]["name"]))
+    # An item another move clears rides along: it names nothing and has no step.
+    items.sort(key=lambda it: (bool(it.get("cleared_by")), -level_rank(it["dep"].get("level")), it["project"]["name"]))
+    own = [it for it in items if not it.get("cleared_by")]
     first, p0 = items[0]["dep"], items[0]["project"]
     kind = a["key"].split("|")[0]
     a["kind"] = kind
@@ -474,12 +509,12 @@ def describe(a):
     a["ends"] = (first.get("lifecycle") or {}).get("eol") if all(
         it["dep"].get("status") == "eol-soon" and not it["reason"] for it in items) else None
     for it in items:
-        it["to"] = None if it["reason"] else move_to(it["dep"], items)
-        it["steps"] = [] if it["reason"] else steps_for(it["dep"], it["to"] if kind not in ("eol", "sync") else None)
+        it["to"] = None if it["reason"] else move_to(it["dep"], own)
+        it["steps"] = [] if it["reason"] or it.get("cleared_by") else steps_for(it["dep"], it["to"] if kind not in ("eol", "sync") else None)
 
-    names = _uniq(name(it["dep"]) for it in items)
+    names = _uniq(name(it["dep"]) for it in own)
     fam = sorted(names, key=len)[0]
-    tgt = next((target(it["dep"]) for it in items if target(it["dep"])), None)
+    tgt = next((target(it["dep"]) for it in own if target(it["dep"])), None)
     where = f"in {a['projects'][0]}" if len(a["projects"]) == 1 else f"in {len(a['projects'])} projects"
     advisories = _uniq(v["id"] for it in items for v in it["dep"].get("vulnerabilities") or [])
     called = _uniq(v["id"] for it in items for v in it["dep"].get("vulnerabilities") or [] if v.get("reachable") == "called")
@@ -493,7 +528,7 @@ def describe(a):
         fixes = "Fixes " + _plural(len(advisories), "advisory", "advisories")
         if analysed:
             fixes += f" ({len(called)} called)" if called else " (none called)"
-    places = len(_uniq(f"{it['project']['name']}:{src_path(it['dep'])}" for it in items))
+    places = len(_uniq(f"{it['project']['name']}:{src_path(it['dep'])}" for it in own))
     a["released"] = None
     how, steps = None, None
 
@@ -569,7 +604,7 @@ def describe(a):
         a["why"] = next((s["text"] for s in first.get("signals") or [] if s.get("kind") == "abandoned"), "")
         steps = [{"do": "find a maintained alternative, or vendor it and own it"}]
     else:
-        vulnerable = [it for it in items if it["dep"].get("status") == "vulnerable"]
+        vulnerable = [it for it in own if it["dep"].get("status") == "vulnerable"]
         if vulnerable:
             fix = next((it["dep"]["fix"] for it in vulnerable if it["dep"].get("fix")), None)
             a["title"] = f"Upgrade {fam}" + (f" to {fix}" if fix else "") + f" {where}"
@@ -591,8 +626,8 @@ def describe(a):
             a["why"] = ""
             if (first.get("upstream") or {}).get("latest_date"):
                 a["released"] = {"version": None, "date": first["upstream"]["latest_date"]}
-        if len(names) > 1 and all(it["dep"]["ecosystem"] == "npm" for it in items):
-            steps = _npm_install_all(items)
+        if len(names) > 1 and all(it["dep"]["ecosystem"] == "npm" for it in own):
+            steps = _npm_install_all(own)
 
     if steps is None and kind in ("actions", "routine"):
         # Several different changes on one card: its table says what each moves
@@ -724,6 +759,7 @@ def agent_document(data, site, spec_url, repository=None):
                     "compat": d.get("compat"),
                     "signals": d.get("signals") if it["reason"] == "abandoned" else None,
                     "lag": d.get("lag"),
+                    "cleared_by": it.get("cleared_by"),
                     "done_when": _done_when(d, it),
                 }.items() if v not in (None, [], {})})
                 steps += [s for s in it["steps"] if s not in steps]

@@ -66,5 +66,25 @@ class Newest(unittest.TestCase):
         self.assertEqual(release, "300.fc44")
 
 
+
+class NpmRanges(unittest.TestCase):
+    def test_the_forms_package_json_and_a_registry_write(self):
+        for version, spec, want in [
+                ("5.4.21", "^6.0.0 || ^7.0.0 || ^8.0.0", False), ("7.1.0", "^6.0.0 || ^7.0.0 || ^8.0.0", True),
+                ("0.21.5", "^0.21.3", True), ("0.22.0", "^0.21.3", False), ("0.0.4", "^0.0.3", False),
+                ("1.2.9", "~1.2.3", True), ("1.3.0", "~1.2.3", False), ("2.0.0", "1.x", False), ("1.5.0", ">= 1.2 <2", True),
+                ("2.3.9", "1.2.3 - 2.3", True), ("2.4.0", "1.2.3 - 2.3", False), ("2.1.9", "4.1.11", False), ("3.0.0", "*", True)]:
+            self.assertEqual(versions.satisfies(version, spec), want, f"{version} against {spec}")
+
+    def test_a_prerelease_matches_only_a_range_that_names_one(self):
+        self.assertFalse(versions.satisfies("2.0.0-rc.1", "^1.0.0"))
+        self.assertFalse(versions.satisfies("1.0.0-rc.1", "^1.0.0"))
+        self.assertTrue(versions.satisfies("1.0.0-rc.2", "^1.0.0-rc.1"))
+
+    def test_a_range_it_cannot_read_is_unknown_not_false(self):
+        self.assertIsNone(versions.satisfies("1.0.0", "latest"))
+        self.assertIsNone(versions.satisfies("1.0.0", "npm:other@^1"))
+
+
 if __name__ == "__main__":
     unittest.main()

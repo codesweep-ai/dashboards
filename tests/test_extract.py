@@ -48,6 +48,24 @@ tool (
 
 
 class Npm(unittest.TestCase):
+    def test_each_installed_package_names_the_declared_dependencies_that_bring_it_in(self):
+        pkg = json.dumps({"dependencies": {"a": "^1.0.0", "w": "*"}, "devDependencies": {"b": "^1.0.0"}})
+        lock = json.dumps({"packages": {
+            "": {},
+            "node_modules/a": {"version": "1.0.0", "dependencies": {"c": "^1.0.0"}},
+            "node_modules/b": {"version": "1.0.0", "dependencies": {"c": "^2.0.0"}},
+            "node_modules/b/node_modules/c": {"version": "2.0.0"},
+            "node_modules/c": {"version": "1.0.0", "peerDependencies": {"d": "*"}},
+            "node_modules/d": {"version": "1.0.0"},
+            "node_modules/w": {"resolved": "packages/w", "link": True},
+            "packages/w": {"version": "0.1.0", "dependencies": {"d": "*"}},
+        }})
+        _, installed = extract.npm(pkg, lock, "package.json", "package-lock.json", ORG)
+        via = {(i["name"], i["version"]): i["via"] for i in installed}
+        self.assertEqual(via[("c", "1.0.0")], ["a"], "Node resolves b's c to the copy nested under b")
+        self.assertEqual(via[("c", "2.0.0")], ["b"])
+        self.assertEqual(via[("d", "1.0.0")], ["a", "w"], "through a peer, and through a workspace link")
+
     def test_lockfile_resolves_ranges_and_lists_what_it_installs(self):
         pkg = json.dumps({
             "dependencies": {"react": "^18.3.1", "@codesweep-ai/ui": "0.3.1-dev.20260909170256.1638d27"},

@@ -135,7 +135,8 @@ def npm(pkg_text, lock_text, path, lock_path, org):
 
     Returns (direct records, every package the lockfile installs). The second
     list is what vulnerability lookups read, since a hole in a transitive
-    package ships as surely as one in a direct dependency.
+    package ships as surely as one in a direct dependency. Each installed
+    package names, in `via`, the declared dependencies that bring it in.
     """
     try:
         pkg = json.loads(pkg_text)
@@ -151,6 +152,7 @@ def npm(pkg_text, lock_text, path, lock_path, org):
             lock = json.loads(lock_text).get("packages", {})
         except ValueError:
             lock = {}
+        via = _via(lock, declared)
         for key, meta in lock.items():
             if not key or "node_modules/" not in key or meta.get("link"):
                 continue
@@ -160,7 +162,8 @@ def npm(pkg_text, lock_text, path, lock_path, org):
                 # is direct only when package.json names it.
                 installed.append({"name": name, "version": meta["version"], "dev": bool(meta.get("dev")),
                                   "direct": key == f"node_modules/{name}" and name in declared,
-                                  "install_script": bool(meta.get("hasInstallScript"))})
+                                  "install_script": bool(meta.get("hasInstallScript")),
+                                  "via": sorted(via.get(key, ()))})
 
     deps = []
     for section, scope in _NPM_SECTIONS:
@@ -195,6 +198,40 @@ def npm(pkg_text, lock_text, path, lock_path, org):
                              scope="engines", datasource="node", label=RUNTIME_LABELS["node"],
                              constraint=node, floating=True, cycle=floor.group(1).split(".")[0]))
     return deps, installed
+
+
+def _via(lock, roots):
+    """For each lockfile entry, the declared dependencies whose install reaches it.
+
+    A dependency resolves as Node resolves it: to the nearest node_modules/<name>
+    at or above the package asking for it.
+    """
+    def find(at, name):
+        while True:
+            key = (at + "/" if at else "") + "node_modules/" + name
+            if key in lock:
+                return key
+            if not at:
+                return None
+            cut = at.rfind("/node_modules/")
+            at = at[:cut] if cut >= 0 else ""
+
+    via = {}
+    for root in roots:
+        todo, seen = [find("", root)], set()
+        while todo:
+            key = todo.pop()
+            if key is None or key in seen:
+                continue
+            seen.add(key)
+            via.setdefault(key, set()).add(root)
+            meta = lock.get(key) or {}
+            if meta.get("link"):
+                todo.append(meta.get("resolved"))
+                continue
+            for section in ("dependencies", "optionalDependencies", "peerDependencies"):
+                todo += [find(key, n) for n in meta.get(section) or {}]
+    return via
 
 
 # --- GitHub Actions -----------------------------------------------------------
@@ -705,17 +742,21 @@ def lockfile_records(deps, installed, org):
     The inventory is then complete. resolve.py reads only their newest versions.
     """
     seen = {(d["name"], d.get("version")) for d in deps if d["ecosystem"] == "npm"}
-    out = []
+    out = {}
     for inst in installed:
         key = (inst["name"], inst["version"])
+        made = out.get(key)
+        if made and made["sources"][0]["path"] == inst["lockfile"]:
+            # Another copy at the same version, nested elsewhere in the same tree.
+            made["via"] = sorted(set(made["via"]) | set(inst.get("via") or ()))
         if inst["direct"] or key in seen:
             continue
         seen.add(key)
-        out.append({"ecosystem": "npm", "name": inst["name"], "version": inst["version"], "scope": "transitive",
+        out[key] = {"ecosystem": "npm", "name": inst["name"], "version": inst["version"], "scope": "transitive",
                     "internal": inst["name"].startswith(f"@{org}/"), "dev": inst["dev"],
                     "sources": [{"path": inst["lockfile"], "line": None}], "datasource": "npm",
-                    "package": inst["name"]})
-    return out
+                    "package": inst["name"], "via": inst.get("via") or []}
+    return list(out.values())
 
 
 _SCOPE_RANK = {"direct": 0, "tool": 1, "build": 2, "toolchain": 3, "dev": 4, "ci": 5, "deploy": 6,

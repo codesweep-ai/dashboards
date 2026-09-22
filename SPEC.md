@@ -260,7 +260,7 @@ in short, and the page shows it under Sources.
 
 | Source | Read from | What the collector takes | Access | Data terms | Notes |
 |---|---|---|---|---|---|
-| [deps.dev](https://deps.dev) | `api.deps.dev/v3` version and project endpoints | Each version's licenses, publish date, deprecation, provenance and source repository; each repository's license, stars and OpenSSF Scorecard checks | none | CC-BY-4.0 | One stable v3 call per version the previous file does not already describe. Deprecation is asked for every direct record. |
+| [deps.dev](https://deps.dev) | `api.deps.dev/v3` version, dependencies and project endpoints | Each version's licenses, publish date, deprecation, provenance and source repository; each repository's license, stars and OpenSSF Scorecard checks; what installing an npm version brings in | none | CC-BY-4.0 | One stable v3 call per version the previous file does not already describe. Deprecation is asked for every direct record. The dependency graph is asked only of a version an upgrade moves to, when a vulnerable lockfile package hangs from it. |
 | [ClearlyDefined](https://clearlydefined.io) | `api.clearlydefined.io/definitions`, in batches, without file lists | The licenses scans found in a shipped package's files, and its license score | none | CC0-1.0 | Evidence only: a failure leaves no verdict changed. |
 | [ScanCode LicenseDB](https://scancode-licensedb.aboutcode.org) | `scancode-licensedb.aboutcode.org/index.json` | The category of each license, shown beside a license the policy does not name | none | CC-BY-4.0 | A hint only: no verdict depends on it. |
 | [Fedora mdapi](https://mdapi.fedoraproject.org) | `mdapi.fedoraproject.org/<branch>/pkg/<name>` | The version a package name resolves to in a Fedora release, its architecture, and the packages built from the same source | none | none stated |  |
@@ -361,6 +361,8 @@ Each record in `dependencies` has this shape:
   "release": "44",                   // a system package or kernel: the Fedora release it comes from
   "snapshot": "2026-09-07T21:57:45Z",   // a system package: when its image was built
   "lockfile": "apps/viewer/package-lock.json",   // npm: the lockfile that resolved it
+  "via": ["vitest"],                 // a vulnerable transitive package: the declared dependencies that install it
+  "cleared_by": [ { "name": "vitest", "version": "4.1.11" } ],   // …and the moves that drop every affected copy
   "upstream_repo": "github.com/vitest-dev/vitest",   // the source repository, for grouping and Scorecard
   "upstream": {
     "latest": "1.17.0",
@@ -701,6 +703,12 @@ to.
 - **Actions are ordered within a tier** by passed fix-by dates, then level, exploitation, EPSS, gap age,
   and the number of projects.
 - **An accepted record is no work.** It stays on the record and leaves every action.
+- **A lockfile package another move clears joins that move's action.** `cleared_by` on its record names
+  the declared dependencies that install it, when each moves and deps.dev's graph of the version it moves
+  to asks for no affected copy. A range the pinned copy satisfies does not clear it, because npm keeps a
+  copy that satisfies the range. When one upgrade action makes every move named, the package leaves the
+  lockfile refresh for that action, with its advisories and its `done_when`. A refresh left with nothing
+  is not listed.
 
 ## The actions file
 
@@ -750,6 +758,7 @@ https://codesweep.ai/dashboards/deps-actions.json
         "license": { /* the record's, for a license change */ },
         "lifecycle": { "product": "…", "cycle": "…", "eol": "…", "phase": "…", "url": "…" },
         "compat": { /* the record's */ }, "lag": { /* the record's */ },
+        "cleared_by": ["vitest"],      // a lockfile package this action's own moves clear, with no step of its own
         "signals": [ /* the record's, for an abandoned package */ ],
         "done_when": "apps/viewer/package-lock.json carries no copy of vitest that GHSA-… affects"
       } ],

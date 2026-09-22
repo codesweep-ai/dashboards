@@ -203,3 +203,72 @@ def cycle_of(raw, width=2):
     if v is None:
         return None
     return ".".join(str(n) for n in v.nums[:width])
+
+
+# --- npm ranges ------------------------------------------------------------------
+
+_PARTIAL = re.compile(r"^v?(\*|x|X|\d+)(?:\.(\*|x|X|\d+)(?:\.(\*|x|X|\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?)?)?$")
+
+
+def _bounds(op, text):
+    """The comparators one npm range term means, as (operator, Version) pairs, or None when unreadable."""
+    m = _PARTIAL.match(text)
+    if not m:
+        return None
+    nums = [None if p is None or p in "*xX" else int(p) for p in m.group(1, 2, 3)]
+    pre = m.group(4)
+    known = next((i for i, n in enumerate(nums) if n is None), 3)
+
+    def ver(parts, prerelease=None):
+        parts = list(parts) + [0] * (3 - len(parts))
+        return parse(".".join(str(p) for p in parts) + (f"-{prerelease}" if prerelease else ""))
+
+    def up(i):
+        # The first version past everything the first `i` numbers name.
+        return ver(nums[:i - 1] + [nums[i - 1] + 1], "0")
+
+    if known == 0:
+        return [] if op in ("", "=", ">=", "<=", "~", "^") else [("<", ver([0, 0, 0], "0"))]
+    exact = ver(nums[:known], pre)
+    if op in ("", "="):
+        return [("=", exact)] if known == 3 else [(">=", exact), ("<", up(known))]
+    if op == "~":
+        return [(">=", exact), ("<", up(min(known, 2)))]
+    if op == "^":
+        lead = next((i for i, n in enumerate(nums[:known]) if n != 0), known - 1)
+        return [(">=", exact), ("<", up(lead + 1 if lead < known else known))]
+    if op == ">":
+        return [(">", exact)] if known == 3 else [(">=", up(known))]
+    if op == "<=":
+        return [("<=", exact)] if known == 3 else [("<", up(known))]
+    return [(op, exact)]
+
+
+def satisfies(raw, spec):
+    """Whether npm would accept version `raw` for range `spec`: True, False, or None when either is unreadable.
+
+    Reads what package.json and a registry's dependency lists write: `^1.2.3`,
+    `~1.2`, `1.x`, `>=1 <2`, `1.2.3 - 2`, and alternatives joined by `||`. A
+    prerelease matches only a term naming a prerelease of the same release.
+    """
+    v = parse(raw)
+    if v is None or spec is None:
+        return None
+    spec = re.sub(r"(<=|>=|<|>|=|~|\^)\s+", r"\1", spec.strip())
+    for alt in spec.split("||"):
+        alt = alt.strip()
+        m = re.fullmatch(r"(\S+)\s+-\s+(\S+)", alt)
+        terms = [(">=", m.group(1)), ("<=", m.group(2))] if m else [
+            re.match(r"^(<=|>=|<|>|=|~|\^)?(.*)$", t).groups("") for t in alt.split()]
+        comps = []
+        for op, text in terms:
+            got = _bounds(op, text or "*")
+            if got is None:
+                return None
+            comps += got
+        named = (parse(text) for _, text in terms)
+        if v.is_prerelease and not any(n and n.pre and n.nums[:3] == v.nums[:3] for n in named):
+            continue
+        if all({"=": v == c, ">": c < v, ">=": not v < c, "<": v < c, "<=": not c < v}[op] for op, c in comps):
+            return True
+    return False

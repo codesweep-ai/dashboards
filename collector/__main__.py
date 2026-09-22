@@ -372,6 +372,8 @@ def main(argv=None):
             if d["ecosystem"] == "npm" and installed.get((d["name"], d.get("version")), {}).get("install_script"):
                 d["install_script"] = True
             resolver.classify(d)
+            if d["scope"] == "transitive" and d["status"] != "vulnerable":
+                d.pop("via", None)  # kept where it can explain a fix, and the file stays small
             accept = policy.accepted(p["name"], d, config.get("accepted", []), now)
             if accept:
                 d["accepted"] = accept
@@ -411,6 +413,13 @@ def main(argv=None):
     # The work the records call for, decided once: the page renders it and an
     # agent follows it. Items point at records by index, so this runs after the sort.
     live = [p for p in projects if not p.get("error")]
+    log("reading what each planned npm move installs")
+    try:
+        resolver.cleared_by_moves(live)
+    except FetchError as exc:
+        log(f"dependency graphs not read: {exc}")
+        for p in live:
+            p.setdefault("notes", []).append(f"dependency graphs not read: {exc.reason}")
     actions.annotate_records(live)
     for p in live:
         p["_actions"] = actions.build([p])
