@@ -3,17 +3,19 @@
   "title": "The Makefile invents an owner when origin is not a GitHub URL, and the clone then fails as a credential error",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "deps-maintenance campaign, pilots 1 and 2: F15.8 and F15.9 in the pilot1 orchestrator's findings log (campaign-workspaces/deps-maintenance/pilot/archives/deps-pilot-20260922T141947Z/orchestrator/output/findings-log.md), and the special-cased gate command pilot2 and pilot3 carry",
   "opened": "2026-09-22",
-  "resolved": null,
+  "resolved": "2026-09-22",
   "stint": "pilot2-tier2",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "1568449"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`python3 -m unittest tests.test_owner` passes 7 tests at 1568449, and fails 8 checks against 91970e3's Makefile and collector. Those are the alias, trailing-slash and ssh-alias origins, the three `owner` target cases and both collector refusals; only the Actions case already passed. In a clone whose origin is `/run/cs-sandbox-repo-2`, `make ci` exits 2 in 0.14 seconds with `owner: REPOSITORY is '/run/cs-sandbox-repo-2' and OWNER is 'run', which name no GitHub repository.`, then the line naming `OWNER=` and `REPOSITORY=`. The same clone passes `make ci` with pilot3's `OWNER=` and `REPOSITORY=` overrides, unchanged, in 15 seconds. Run with `--owner /run/cs-sandbox-repo-2`, the collector exits 2 and clones nothing. `make ci` in this repository passes with GH_TOKEN set, running 118 unit tests."
   },
-  "resolution": null,
+  "resolution": "Every target that reads GitHub first runs `owner`, which stops the run when `REPOSITORY` is not `owner/name` and names both overrides. The origin parse also strips an ssh host alias and a trailing slash. The collector refuses an owner or a `$GITHUB_REPOSITORY` that GitHub could not hold, before it clones anything.",
   "details": "The Makefile derives `REPOSITORY` from `git remote get-url origin` and `OWNER` from its first path segment. It strips three GitHub URL prefixes and trusts whatever is left. A campaign member's origin is a local path such as `/run/cs-sandbox-repo-2`, so the owner comes out as `run`. `make ci` then clones `https://github.com/run/dashboards/` and fails with `fatal: Authentication failed`, which reads as a credential problem rather than a wrong owner.\n\nIn pilot1 this cost a definition-of-done item: dashboards' `make ci` could not complete at any head, and three gate verdicts had no reproducible evidence. Pilot2 and pilot3 work around it by passing `OWNER=` and `REPOSITORY=` naming the fork. A human meeting it cold has no such hint.\n\nThe same parse misreads an origin cloned through an ssh host alias, such as `github.com-<account>`, which a workspace of forks uses to pick the right key. The alias is left in place, and the owner comes out as the whole scp-style prefix.\n\nA derived value that cannot be an `owner/name` should stop the run at once and name the `OWNER=` and `REPOSITORY=` overrides. The collector takes `--owner` without checking it either, and it runs standalone.",
   "notes": [],
   "links": []
