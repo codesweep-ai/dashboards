@@ -7,13 +7,17 @@
 # run with `go tool`, so a fresh checkout runs the gate with nothing installed
 # by hand. `make repin` moves that pin.
 # The pages need Node for one thing only: the design tokens come out of the
-# @codesweep-ai/ui package rather than a copy in this repository.
+# @codesweep-ai/ui package rather than a copy in this repository. Every install
+# runs through scripts/with-npmrevs.sh, which puts cs-npmrevs in front of
+# npmjs.com, so a ui build packed on this machine or pushed as an image installs
+# too. The script says how it picks the registry.
 # The dependencies collector needs Python 3 and git and nothing installed: it is
 # the standard library, run as `python3 -m collector`.
 
 CS_LINT ?= go tool cs-lint
 PYTHON  ?= python3
 NPM     ?= npm
+WITH_NPMREVS := $(abspath scripts/with-npmrevs.sh)
 
 # The pages and the data the preview tree is assembled from. README.md is not
 # here: Jekyll renders it as the site's index in production, and the preview
@@ -43,7 +47,7 @@ help:
 
 ## deps: install what the pages are built from
 deps:
-	$(NPM) ci
+	$(WITH_NPMREVS) $(NPM) ci
 
 ## tokens: copy the design tokens out of @codesweep-ai/ui
 ##
@@ -51,7 +55,7 @@ deps:
 ## `npm install` is what updates it.
 tokens: tokens.css
 tokens.css: package-lock.json scripts/copy-tokens.mjs
-	@test -d node_modules || $(NPM) install --silent
+	@test -d node_modules || $(WITH_NPMREVS) $(NPM) install --silent
 	@$(NPM) run --silent tokens
 
 ## build: assemble the local preview tree from the pages and the status files

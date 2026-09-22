@@ -92,7 +92,11 @@ with a word beside it. The dataviz palette validator is how that was measured.
 through that package's own `@codesweep-ai/ui/tokens` export, and it is
 gitignored. Never edit it: the next `make build` overwrites you. To take a
 design system update, move the dependency with
-`npm install @codesweep-ai/ui@latest` and commit the lockfile.
+`scripts/with-npmrevs.sh npm install @codesweep-ai/ui@latest` and commit the
+lockfile. That script puts [cs-npmrevs](https://github.com/codesweep-ai/npmrevs),
+pinned in `go.mod`, in front of npmjs.com. A ui version that exists only as an
+image, or as a build `npm run registry:pack` packed on this machine, then
+installs too. `make deps` runs `npm ci` through it.
 
 **Class names are BEM**, as `DESIGN_SYSTEM_SPEC.md` §7.8 in that repository
 prescribes for domain CSS outside the component library: `.ci-card__head`,
