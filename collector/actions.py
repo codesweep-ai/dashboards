@@ -184,6 +184,20 @@ def _set_at(d, s, v):
             "from": d.get("version"), "to": v}
 
 
+def _go_get(d, s, v):
+    """`go get` in one module file: the commands it names as tools, or else the module, at `v`.
+
+    `-tool` with the module path would add the module as a second tool line.
+    A module file beside go.mod holds one tool's requirements and none of the
+    directory's packages, which tidy would pull in, so only go.mod is tidied.
+    """
+    tools = s.get("tools")
+    what = " ".join(f"{x}@{v}" for x in tools) if tools else f"{d['name']}@{v}"
+    flag = _modfile_flag(s["path"])
+    return {"run": f"go get {flag}{'-tool ' if tools else ''}{what}" + ("" if flag else " && go mod tidy"),
+            "cwd": dir_of(s["path"])}
+
+
 def _each_place(d, sources, in_modfile, v):
     """A step for every place a Go pin is written: `in_modfile(source)` in a module file, an edit anywhere else."""
     steps = []
@@ -234,9 +248,7 @@ def steps_for(d, to=None):
                     **{"from": d.get("version"), "to": t})
     if d["ecosystem"] == "go" and t:
         version = d.get("fix") or t
-        if re.search(r"go\.[\w-]+\.mod$", path) and path != "go.mod" and not path.endswith("/go.mod"):
-            return run(f"go get -modfile={path.rsplit('/', 1)[-1]} -tool {d['name']}@{version}", dir_of(path))
-        return run(f"go get {'-tool ' if d.get('scope') == 'tool' else ''}{d['name']}@{version} && go mod tidy")
+        return _each_place(d, sources, lambda s: _go_get(d, s, version), version)
     if d["ecosystem"] == "npm" and t:
         version = d["fix"] if d.get("fix") and d.get("status") == "vulnerable" else t
         return run(f"npm install {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{version}")

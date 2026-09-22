@@ -44,6 +44,19 @@ class GoProject(unittest.TestCase):
         ])
         self.assertEqual(act["changes"][0]["files"], ["go.golangci.mod:4", "go.mod:3", "image/Containerfile.base:3"])
 
+    def test_a_tool_moves_by_its_command_and_its_module_file_is_never_tidied(self):
+        p = fixture("go-project", {
+            "github.com/golangci/golangci-lint/v2": {"status": "patch", "level": "info", "upstream": {"latest": "v2.13.2"}},
+            "golang.org/x/tools": {"status": "minor", "level": "info", "upstream": {"latest": "v0.50.0"}},
+        })
+        act = document(p)["go-project:routine:go"]
+        self.assertEqual(act["steps"], [
+            {"run": "go get -modfile=go.golangci.mod -tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2", "cwd": "."},
+            {"run": "go get -modfile=go.golangci.mod golang.org/x/tools@v0.50.0", "cwd": "."},
+            {"run": "go get -tool golang.org/x/tools/cmd/deadcode@v0.50.0 && go mod tidy", "cwd": "."},
+            {"edit": "image/Containerfile.base", "line": 8, "text": "set the version to v0.50.0", "from": "v0.49.0", "to": "v0.50.0"},
+        ])
+
 
 if __name__ == "__main__":
     unittest.main()

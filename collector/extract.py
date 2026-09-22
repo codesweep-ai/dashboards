@@ -91,6 +91,13 @@ def go_mod(text, path, org):
             continue
         if any(t == d["name"] or t.startswith(d["name"] + "/") for t in tools):
             d["scope"] = "tool"
+    # Each tool belongs to the longest module path it extends, and its source
+    # names it, because `go get -tool` takes the command and not the module.
+    mods = sorted((d for d in deps if d["ecosystem"] == "go"), key=lambda d: -len(d["name"]))
+    for t in tools:
+        owner = next((d for d in mods if t == d["name"] or t.startswith(d["name"] + "/")), None)
+        if owner:
+            owner["sources"][0].setdefault("tools", []).append(t)
     return deps
 
 

@@ -346,6 +346,7 @@ Each record in `dependencies` has this shape:
   "floating": false,                 // names a line rather than a release: `v7`, `24`, a dnf package
   "sources": [ { "path": "internal/fcdisk/build.go", "line": 73 } ],   // every place it is declared
   // A source folded in from a Containerfile ARG names it: { "path": "…", "line": 3, "arg": "GO_VERSION" }
+  // A Go module file naming the module's commands as tools lists them: "tools": ["…/cmd/golangci-lint"]
   "datasource": "github",            // where its upstream is read: github, npm, goproxy, pypi, golang, node,
                                      // python, temurin, maven, oci, runner, rpm or fedora-kernel
   "package": "firecracker-microvm/firecracker",   // its name at that datasource, when it differs
@@ -767,6 +768,9 @@ https://codesweep.ai/dashboards/deps-actions.json
   whose manifest declares the dependency. A Go pin gets one for every module file: `go mod edit` or
   `go get`, with `-modfile` naming a file other than `go.mod`. A place no command maintains, such as a
   Containerfile `ARG`, gets an edit.
+- **`go get` moves a tool by its command,** `-tool …/cmd/golangci-lint@v2.13.2`, which loads what the
+  command imports. The module path would add a second tool line. Only `go.mod` is tidied: a module file
+  beside it holds a tool's requirements, and tidy would add the directory's packages to it.
 - **`requires` orders the work.** An action comes after every action it requires, in the file as in time.
 - **`options` is a choice for a person.** The collector recommends one and picks none. An agent proposes
   the recommended option, and makes none of them unasked.

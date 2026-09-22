@@ -39,6 +39,13 @@ tool (
         go = by(deps, "go")[0]
         self.assertEqual((go["ecosystem"], go["version"], go["sources"][0]["line"]), ("runtime", "1.27.0", 3))
 
+    def test_a_tool_is_named_on_the_source_of_the_longest_module_it_extends(self):
+        text = ("module m\n\ngo 1.27.0\n\ntool (\n\tgolang.org/x/tools/cmd/deadcode\n\tgolang.org/x/tools/gopls\n)\n\n"
+                "require (\n\tgolang.org/x/tools v0.49.0 // indirect\n\tgolang.org/x/tools/gopls v0.21.0 // indirect\n)\n")
+        deps = extract.go_mod(text, "go.mod", ORG)
+        self.assertEqual(by(deps, "golang.org/x/tools")[0]["sources"][0]["tools"], ["golang.org/x/tools/cmd/deadcode"])
+        self.assertEqual(by(deps, "golang.org/x/tools/gopls")[0]["sources"][0]["tools"], ["golang.org/x/tools/gopls"])
+
 
 class Npm(unittest.TestCase):
     def test_lockfile_resolves_ranges_and_lists_what_it_installs(self):
