@@ -96,6 +96,13 @@
     {"run": "bin/cs-ledger render ledger && bin/cs-ledger render fixtures/sandbox/ledger", "cwd": "."},
     {"edit": "MANUAL.md", "text": "set the renderer and @codesweep-ai/ui versions in the sample `cs-ledger version` line"}
    ]
+  },
+  {
+   "project": "campaign",
+   "name": "@codesweep-ai/ui",
+   "steps": [
+    {"run": "make viewer-build", "cwd": "."}
+   ]
   }
  ],
  "licenses": {

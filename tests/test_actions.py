@@ -170,7 +170,7 @@ class Ledger(unittest.TestCase):
             {"edit": "internal/ledger/render.go", "line": 6, "text": f"set the version to {built}",
              "from": "0.3.1-dev.20260909170256.1638d27", "to": built},
         ])
-        self.assertEqual(act["steps"][2:], CONFIG["after"][0]["steps"])
+        self.assertEqual(act["steps"][2:], next(a["steps"] for a in CONFIG["after"] if a["project"] == "ledger"))
         self.assertNotIn("internal/ledger", [s.get("cwd") for s in act["steps"]])
 
 
