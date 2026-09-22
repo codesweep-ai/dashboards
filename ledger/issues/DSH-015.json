@@ -1,0 +1,20 @@
+{
+  "id": "DSH-015",
+  "title": "The Makefile invents an owner when origin is not a GitHub URL, and the clone then fails as a credential error",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "deps-maintenance campaign, pilots 1 and 2: F15.8 and F15.9 in the pilot1 orchestrator's findings log (campaign-workspaces/deps-maintenance/pilot/archives/deps-pilot-20260922T141947Z/orchestrator/output/findings-log.md), and the special-cased gate command pilot2 and pilot3 carry",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "pilot2-tier2",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "The Makefile derives `REPOSITORY` from `git remote get-url origin` and `OWNER` from its first path segment. It strips three GitHub URL prefixes and trusts whatever is left. A campaign member's origin is a local path such as `/run/cs-sandbox-repo-2`, so the owner comes out as `run`. `make ci` then clones `https://github.com/run/dashboards/` and fails with `fatal: Authentication failed`, which reads as a credential problem rather than a wrong owner.\n\nIn pilot1 this cost a definition-of-done item: dashboards' `make ci` could not complete at any head, and three gate verdicts had no reproducible evidence. Pilot2 and pilot3 work around it by passing `OWNER=` and `REPOSITORY=` naming the fork. A human meeting it cold has no such hint.\n\nThe same parse misreads an origin cloned through an ssh host alias, such as `github.com-<account>`, which a workspace of forks uses to pick the right key. The alias is left in place, and the owner comes out as the whole scp-style prefix.\n\nA derived value that cannot be an `owner/name` should stop the run at once and name the `OWNER=` and `REPOSITORY=` overrides. The collector takes `--owner` without checking it either, and it runs standalone.",
+  "notes": [],
+  "links": []
+}
