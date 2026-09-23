@@ -275,7 +275,20 @@ def main(argv=None):
         cloned = list(pool.map(fetch, names))
     repos = {n: r for n, r, _ in cloned if r}
 
-    resolver = Resolver(src, org, repos, now)
+    # Every project's status file, before any pin is resolved: a pin on a sibling is
+    # measured against the last commit that sibling built, which its file names.
+    def read_status(name):
+        try:
+            return name, client.json(urllib.parse.urljoin(site, status_paths[name]), accept_missing=True) or {}
+        except FetchError:
+            return name, {}
+    statuses = {}
+    if site:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            statuses = dict(pool.map(read_status, [n for n in repos if status_paths.get(n)]))
+    built = {n: s["built"] for n, s in statuses.items() if isinstance(s.get("built"), dict)}
+
+    resolver = Resolver(src, org, repos, now, built)
     projects = []
     for name, repo, err in cloned:
         project = {"name": name, "repo": {"full_name": f"{owner}/{name}", "url": f"https://github.com/{owner}/{name}"}}
@@ -285,12 +298,7 @@ def main(argv=None):
             projects.append(project)
             continue
         project["repo"].update(branch=repo.branch, sha=repo.sha, committed=iso(repo.committed), description="")
-        if site and status_paths.get(name):
-            try:
-                status = client.json(urllib.parse.urljoin(site, status_paths[name]), accept_missing=True)
-                project["repo"]["description"] = ((status or {}).get("repo") or {}).get("description") or ""
-            except FetchError:
-                pass
+        project["repo"]["description"] = ((statuses.get(name) or {}).get("repo") or {}).get("description") or ""
         found = extract.repository(repo, org, [p for p in pins if p["project"] == name],
                                    [a for a in config.get("after", []) if a["project"] == name])
         deps = found["dependencies"]

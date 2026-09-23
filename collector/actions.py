@@ -74,11 +74,17 @@ def _ts(iso):
         return None
 
 
+def pin_commit(lag):
+    """The commit a pin on a sibling moves to: the sibling's last passing build, as its
+    status file names it, or its branch head where it names none."""
+    return lag.get("built") or lag.get("head")
+
+
 def target(d):
     """The version a record's newest release, or its fix, names."""
     up = d.get("upstream") or {}
     if (d.get("lag") or {}).get("head"):
-        return d["lag"].get("version") or d["lag"]["head"][:7]
+        return d["lag"].get("version") or pin_commit(d["lag"])[:7]
     if d.get("status") == "vulnerable" and d.get("fix") and not up.get("latest"):
         return d["fix"]
     return up.get("latest") or d.get("fix")
@@ -240,7 +246,7 @@ def _own_steps(d, to=None):
         dirs = [cwd] if cwd is not None else _uniq(dir_of(s["path"]) for s in sources)
         return [{"run": cmd, "cwd": x} for x in dirs]
     if d.get("status") == "behind":
-        head = (d.get("lag") or {}).get("head")
+        head = pin_commit(d.get("lag") or {})
         if d["ecosystem"] == "go" and head:
             # The commit itself, in this pin alone: a repin target moves every sibling to main.
             return _each_place(d, sources, lambda s: _go_get(d, s, head), head)
@@ -252,7 +258,6 @@ def _own_steps(d, to=None):
             return _npm_places(d, sources, f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{built}",
                                built)
         if d["ecosystem"] == "actions":
-            head = (d.get("lag") or {}).get("head")
             return edit(f"uses: {d['name']}@{head or '<newest commit>'}", **{"from": (d.get("lag") or {}).get("pinned"), "to": head})
         if d["ecosystem"] == "image":
             return edit(f"{d.get('variable') or 'the image reference'}={t or '<newest tag>'}", **{"from": d.get("version"), "to": t})

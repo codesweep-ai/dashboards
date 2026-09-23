@@ -89,8 +89,9 @@ class Repo:
             return None
         return datetime.fromisoformat(out).astimezone(timezone.utc)
 
-    def behind(self, ref, paths=()):
-        """How many commits the default branch has beyond `ref`.
+    def behind(self, ref, paths=(), upto="HEAD"):
+        """How many commits `upto` has beyond `ref`: the default branch's head, unless
+        another commit is named.
 
         Returns None when `ref` is not in the history at all. With `paths`, only
         commits touching those paths count, which is what an action pinned by
@@ -99,7 +100,7 @@ class Repo:
         full = self.rev(ref)
         if not full:
             return None
-        args = ["rev-list", "--count", f"{full}..HEAD"]
+        args = ["rev-list", "--count", f"{full}..{upto}"]
         if paths:
             args += ["--", *paths]
         return int(_git(args, cwd=self.path).strip() or 0)

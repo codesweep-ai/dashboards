@@ -424,6 +424,7 @@ Each record in `dependencies` has this shape:
                  "eol": "2026-04-22", "lts": false, "latest": "6.19.14", "phase": "eol", "url": "…" },
   "lag": { "commits": 8, "commits_touching": 1, "paths": ["action"], "days": 0.5,
            "head": "d687ad5b27750000…",   // the whole commit the sibling's default branch is at
+           "built": "a48d212425fe0000…",  // the sibling's last passing build, when its status file names one
            "pinned": "4c204c69b8b2",
            "version": "0.3.1-dev.20260922202805.27eb21f",   // npm: the registry's build of that commit
            "builds": 3,                   // an image: newer tier builds, in place of commits
@@ -517,7 +518,7 @@ row that applies wins:
 | `vulnerable` | an advisory affects the pinned version | `critical` for a high or critical advisory in something that ships, or for any advisory exploited in the wild; `serious` otherwise |
 | `eol` | its release cycle is past its end of life | `critical`, `serious` for a dev, CI or optional scope, or `warning` for an `engines` floor |
 | `eol-soon` | its release cycle ends within 90 days | `serious`, or `info` for an `engines` floor |
-| `behind` | an internal pin trails the project it pins | `info` up to 14 days of work, `warning` to 60, `serious` past that |
+| `behind` | an internal pin trails the last passing build of the project it pins | `info` up to 14 days of work, `warning` to 60, `serious` past that |
 | `major` | a newer major version exists | `warning`, or `serious` once that release is a year old |
 | `deprecated` | its publisher deprecated the pinned version | `warning` |
 | `minor`, `patch` | a newer minor or patch release exists | `info`, or `warning` once that release is 90 days old |
@@ -641,7 +642,12 @@ one of Dependabot's dismissal reasons: `fix_started`, `inaccurate`, `no_bandwidt
   object are omitted, except `version`, `eol` and `latest`, whose absence would read as "not looked at".
 - **A libyear is the time from the pinned release to the newest one**, in years. It is counted only for
   a record that is behind with both release dates known. For an internal pin it runs from the pinned
-  commit to the newest commit on the default branch.
+  commit to the commit it trails.
+- **An internal pin trails the sibling's last passing build.** That is the commit the sibling's status
+  file names in `built`, and the one a repin moves a pin to. `lag.commits`, `lag.days` and the compare
+  link run from the pin to it. A pin at that build, or past it, is `current` though the head has moved on.
+  Where the status file names no build, or names one the clone does not hold on the branch, the pin is
+  measured against the head.
 - **Versions compare as numbers.** A pin with fewer components floats inside what it names, so `v7`
   trails `v8` but not `v7.3`. A 0.x minor bump counts as a minor one.
 - **A newer cycle of Node.js, Java or Ubuntu counts once it is long-term support.** Until then the newest
@@ -827,8 +833,8 @@ https://codesweep.ai/dashboards/deps-actions.json
 - **`go get` moves a tool by its command,** `-tool …/cmd/golangci-lint@v2.13.2`, which loads what the
   command imports. The module path would add a second tool line. Only `go.mod` is tidied: a module file
   beside it holds a tool's requirements, and tidy would add the directory's packages to it.
-- **A sibling pin moves to one commit, and no other pin moves with it.** A Go `sync` runs
-  `go get <module>@<lag.head>` in each module file that pins it, with the tool's command as above. An
+- **A sibling pin moves to one commit, and no other pin moves with it.** That commit is `lag.built`,
+  or `lag.head` where there is none. A Go `sync` runs `go get <module>@<commit>` in each module file that pins it, with the tool's command as above. An
   npm `sync` installs `lag.version`, the build the registry holds of that commit. A dist-tag names
   whichever build was tagged last, which can be older than the pin. Until the registry holds the build,
   the step says so instead.
@@ -1096,7 +1102,7 @@ How far a pin on a sibling project trails it.
 |---|---|
 | Renovate | Digest updates move commit pins and Go pseudo-versions forward, one pull request at a time. |
 | Go's moddeps test | The test fails when a vendored module trails its newest version. |
-| **This dashboard** | It counts the commits the sibling's default branch has made since the pin: under an action's own directory for an action, and newer tier builds for an image. A project's card shows its pins on siblings and who pins it. |
+| **This dashboard** | It counts the commits the sibling's default branch has made since the pin, up to the last one the sibling built and passed: under an action's own directory for an action, and newer tier builds for an image. A project's card shows its pins on siblings and who pins it. |
 
 ### Grouping and ordering work
 

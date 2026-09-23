@@ -137,7 +137,8 @@
   }
   function target(d) {
     var up = d.upstream || {};
-    if (d.lag && d.lag.head) return d.lag.head.slice(0, 7);
+    // A sibling pin moves to the sibling's last passing build, else its branch head.
+    if (d.lag && d.lag.head) return (d.lag.built || d.lag.head).slice(0, 7);
     if (d.status === "vulnerable" && d.fix && !up.latest) return d.fix;
     return up.latest || d.fix || null;
   }
@@ -692,7 +693,9 @@
       if (d.error) return '<span class="dp-muted">' + esc(clip(d.error, 50)) + "</span>";
       if (l.builds != null) return l.builds ? plural(l.builds, "newer build") + ", " + fmtSpan(l.days) : "newest build";
       var n = l.commits_touching != null ? l.commits_touching : l.commits;
-      return n ? plural(n, "commit") + (l.commits_touching != null ? " in " + l.paths.join(", ") : "") + (l.days ? ", " + fmtSpan(l.days) : "") : "in sync";
+      if (n) return plural(n, "commit") + (l.commits_touching != null ? " in " + l.paths.join(", ") : "") + (l.days ? ", " + fmtSpan(l.days) : "");
+      // On the sibling's last build while its head has moved on: what a repin picks.
+      return l.built && l.pinned && l.built.indexOf(l.pinned) === 0 && l.built !== l.head ? "at its last build" : "in sync";
     };
     var row = function (other, d) {
       var up = d.upstream || {};
@@ -700,7 +703,7 @@
         navLink(projectHref(other), esc(other === p.name ? other + " (itself)" : other), "dp-pin__who") + '<span class="dp-eco">' + esc(ECO_SHORT[d.ecosystem]) + "</span>" +
         '<span class="dp-pin__what">' + esc(clip(name(d), 40)) + "</span>" +
         '<span class="dp-pin__lag">' + lagText(d) + "</span>" +
-        (up.url && d.lag ? '<a class="dp-pin__cmp" href="' + esc(up.url) + '" target="_blank" rel="noopener" data-tip="' + esc((d.lag.pinned || "") + " → " + (d.lag.head || "")) + '">compare ' + ICON.external + "</a>" : "") + "</li>";
+        (up.url && d.lag ? '<a class="dp-pin__cmp" href="' + esc(up.url) + '" target="_blank" rel="noopener" data-tip="' + esc((d.lag.pinned || "") + " → " + (d.lag.built || d.lag.head || "")) + '">compare ' + ICON.external + "</a>" : "") + "</li>";
     };
     var worst = out.reduce(function (l, d) { return rank(d.level) > rank(l) && d.status === "behind" ? d.level : l; }, "good");
     var behindOut = out.filter(function (d) { return d.status === "behind"; }).length;
@@ -728,7 +731,7 @@
       chip(behindOut ? worst : "good", behindOut ? "behind" : "current", behindOut ? plural(behindOut, "pin") + " behind" : "in sync") + "</header>" +
       '<p class="ci-card__desc">Pins ' + plural(uniq(out.map(function (d) { return d.provider; })).length, "sibling") + " · pinned by " +
       plural(uniq(incoming.map(function (i) { return i.project.name; })).length, "project") + (behindIn ? ", " + behindIn + " of those pins behind" : "") + "</p>" +
-      body + (goBehind ? '<footer class="ci-card__foot"><span class="text-label-upper">How</span> <code>make repin</code> moves every Go tool pin to its newest commit</footer>' : "") + "</article>";
+      body + (goBehind ? '<footer class="ci-card__foot"><span class="text-label-upper">How</span> <code>make repin</code> moves every Go tool pin to its last passing build</footer>' : "") + "</article>";
   }
 
   function renderInternal() {
@@ -738,7 +741,7 @@
       var lb = b.p.dependencies.filter(function (d) { return d.status === "behind"; }).length;
       return lb - la || a.p.name.localeCompare(b.p.name);
     });
-    return '<p class="dp-view__intro">How far each project\'s pins on its siblings trail their default branches, and who pins it in turn. ' +
+    return '<p class="dp-view__intro">How far each project\'s pins on its siblings trail the last commit each sibling built and passed, and who pins it in turn.' +
       "Go pseudo-versions, the org's npm dev builds, actions pinned by commit and image tiers all count.</p>" +
       '<div class="ci-grid" id="internal-cards">' + (cards.length ? cards.map(function (c) { return c.html; }).join("") : '<p class="dp-muted">No project pins another.</p>') + "</div>";
   }

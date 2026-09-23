@@ -74,6 +74,15 @@ class GoProject(unittest.TestCase):
         self.assertEqual(act["steps"], [{"run": f"go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@{head} && go mod tidy",
                                          "cwd": "."}])
 
+    def test_a_sibling_pin_moves_to_its_last_passing_build_rather_than_its_head(self):
+        head, built = "a48d212425fe0a9d5822b3dcfe670b61dfa41045", "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
+        p = fixture("go-project", {"github.com/codesweep-ai/ledger": {
+            "status": "behind", "level": "info", "provider": "ledger",
+            "lag": {"commits": 5, "head": head, "built": built, "pinned": "bbe29a48e449"}}})
+        act = document(p)["go-project:sync:ledger-go-github-com-codesweep-ai-ledger"]
+        self.assertEqual(act["steps"], [{"run": f"go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@{built} && go mod tidy",
+                                         "cwd": "."}])
+
     def test_a_vulnerable_module_is_done_when_no_module_file_requires_an_affected_version(self):
         p = fixture("go-project", {"golang.org/x/tools": {
             "status": "vulnerable", "level": "serious", "fix": "v0.50.0", "upstream": {"latest": "v0.50.0"},

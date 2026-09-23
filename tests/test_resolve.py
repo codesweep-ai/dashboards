@@ -23,24 +23,33 @@ class FakeSources:
 
 
 class FakeRepo:
+    """A sibling's clone. `behind` is how far the pin trails the head, or a map from
+    the commit it is counted to ("HEAD", or a built commit) to how far it trails that."""
+
     def __init__(self, behind, touching=None, committed=NOW, pinned_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                 url="https://github.com/codesweep-ai/ledger"):
+                 url="https://github.com/codesweep-ai/ledger", times=None, off_branch=()):
         self._behind, self._touching = behind, touching
         self.committed, self._pinned_at = committed, pinned_at
+        self._times, self._off = times or {}, set(off_branch)
         self.sha, self.branch, self.url = "d687ad5b27750000", "main", url
 
-    def behind(self, ref, paths=()):
-        return self._touching if paths else self._behind
+    def rev(self, ref):
+        return ref or None
+
+    def behind(self, ref, paths=(), upto="HEAD"):
+        if paths:
+            return self._touching
+        return self._behind.get(upto) if isinstance(self._behind, dict) else self._behind
 
     def commit_time(self, ref):
-        return self._pinned_at
+        return self._times.get(ref, self._pinned_at)
 
     def on_branch(self, ref):
-        return True
+        return ref not in self._off
 
 
-def resolver(sources=None, repos=None):
-    return resolve.Resolver(sources or FakeSources(), "codesweep-ai", repos or {}, NOW)
+def resolver(sources=None, repos=None, built=None):
+    return resolve.Resolver(sources or FakeSources(), "codesweep-ai", repos or {}, NOW, built)
 
 
 def dep(**kw):
@@ -154,6 +163,45 @@ class Resolve(unittest.TestCase):
                                               version="v0.0.0-20260901000000-bda511aea589", internal=True,
                                               scope="tool", datasource="goproxy"))
         self.assertEqual(d["upstream"]["url"], "https://github.com/alice/ledger/compare/bda511aea589...main")
+
+    LEDGER_PIN = dict(name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
+                      version="v0.0.0-20260901000000-bda511aea589", internal=True, scope="tool", datasource="goproxy")
+    BUILT = "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
+
+    def test_a_pin_on_the_last_build_is_in_sync_though_the_head_moved_on(self):
+        # The head is 3 commits past the pin, none of them built: a repin would not move it.
+        repos = {"ledger": FakeRepo(behind={"HEAD": 3, self.BUILT: 0})}
+        d = resolver(repos=repos, built={"ledger": {"commit": self.BUILT}}).resolve(dep(**self.LEDGER_PIN))
+        self.assertEqual((d["lag"]["commits"], d["lag"]["built"]), (0, self.BUILT))
+        self.assertEqual(resolver().classify(d)["status"], "current")
+
+    def test_a_pin_behind_the_last_build_counts_commits_to_it(self):
+        built_at = datetime(2026, 9, 6, tzinfo=timezone.utc)
+        repos = {"ledger": FakeRepo(behind={"HEAD": 9, self.BUILT: 4}, times={self.BUILT: built_at})}
+        d = resolver(repos=repos, built={"ledger": {"commit": self.BUILT}}).resolve(dep(**self.LEDGER_PIN))
+        self.assertEqual(d["lag"]["commits"], 4)
+        self.assertEqual(d["lag"]["days"], 5.0)
+        self.assertEqual(d["upstream"]["url"], "https://github.com/codesweep-ai/ledger/compare/bda511aea589...c0ffee00c0ff")
+        self.assertEqual(resolver().classify(d)["status"], "behind")
+
+    def test_without_a_last_build_a_pin_is_counted_to_the_head(self):
+        for built in (None, {"ledger": {"commit": self.BUILT}}):
+            # No status file names one, or the one it names is off the branch.
+            repos = {"ledger": FakeRepo(behind={"HEAD": 3, self.BUILT: 0}, off_branch=[self.BUILT])}
+            d = resolver(repos=repos, built=built).resolve(dep(**self.LEDGER_PIN))
+            self.assertEqual(d["lag"]["commits"], 3)
+            self.assertNotIn("built", d["lag"])
+
+    def test_an_internal_npm_pin_names_the_version_the_last_build_published(self):
+        src = FakeSources(npm_latest={"version": "0.0.0-20260901000000-129b17f78d58",
+                                      "repository": "git+https://github.com/codesweep-ai/ledger.git"},
+                          npm_versions=["0.0.0-20260912000000-d687ad5b2775"])
+        built = {"ledger": {"commit": self.BUILT,
+                            "versions": {"npm": {"@codesweep-ai/ledger": "0.0.0-20260910000000-c0ffee00c0ff"}}}}
+        d = resolver(src, {"ledger": FakeRepo(behind={"HEAD": 8, self.BUILT: 5})}, built).resolve(dep(
+            ecosystem="npm", name="@codesweep-ai/ledger", package="@codesweep-ai/ledger", scope="dev",
+            version="0.0.0-20260905000000-bda511aea589", internal=True, datasource="npm"))
+        self.assertEqual((d["lag"]["commits"], d["lag"]["version"]), (5, "0.0.0-20260910000000-c0ffee00c0ff"))
 
     def test_an_internal_image_links_to_the_namespace_it_is_named_in(self):
         tags = ["v0.0.0-20260910000000-aaaaaaaaaaaa", "v0.0.0-20260901000000-bbbbbbbbbbbb"]

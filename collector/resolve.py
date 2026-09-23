@@ -58,11 +58,14 @@ def days_between(a, b):
 
 
 class Resolver:
-    def __init__(self, sources, org, repos, now):
+    def __init__(self, sources, org, repos, now, built=None):
         self.src = sources
         self.org = org
         self.repos = repos
         self.now = now
+        # Each sibling's last passing build, as its status file names it in `built`:
+        # the commit a repin moves a pin to, and the versions it was published under.
+        self.built = built or {}
 
     # --- one record -------------------------------------------------------------
 
@@ -133,10 +136,14 @@ class Resolver:
             self._internal_commit(dep, repo, version)
             lag = dep.get("lag") or {}
             if lag.get("commits"):
-                # The version to install is the one built from the head commit. A
+                # The version to install is the one built from the commit the pin moves
+                # to. Its status file says which npm version that build published; a
                 # dist-tag names whichever build was tagged last, which can be older.
-                built = [v for v in self.src.npm_versions(name) or []
-                         if versions.pseudo(v) and lag["head"].startswith(versions.pseudo(v)[1])]
+                to = lag.get("built") or lag["head"]
+                named = ((self.built.get(repo) or {}).get("versions") or {}).get("npm") or {}
+                built = [named[name]] if lag.get("built") and named.get(name) else \
+                    [v for v in self.src.npm_versions(name) or []
+                     if versions.pseudo(v) and to.startswith(versions.pseudo(v)[1])]
                 if built:
                     lag["version"] = built[-1]
             return
@@ -527,7 +534,14 @@ class Resolver:
     # --- sibling repositories -------------------------------------------------------------
 
     def _internal_commit(self, dep, repo_name, version, paths=()):
-        """How far a pin on another project's commit trails that project's default branch."""
+        """How far a pin on another project's commit trails the last commit that project built.
+
+        A repin moves a pin to the newest commit the sibling's CI built and passed,
+        which its status file names in `built`. A commit past that one is still
+        building, failed, or changed nothing CI builds, so a pin at the built commit,
+        or past it, trails nothing. A sibling that names no built commit, or one this
+        clone does not hold on its branch, is measured against its branch head.
+        """
         stamp = versions.pseudo(version)
         sha = stamp[1] if stamp else version
         repo = self.repos.get(repo_name)
@@ -535,25 +549,33 @@ class Resolver:
         if repo is None:
             dep["error"] = f"{repo_name} is not a project this page reads"
             return
-        behind = repo.behind(sha)
+        named = (self.built.get(repo_name) or {}).get("commit")
+        built = repo.rev(named) if named else None
+        if built and not repo.on_branch(built):
+            built = None
+        upto = built or "HEAD"
+        behind = repo.behind(sha, upto=upto)
         if behind is None:
             dep["error"] = f"commit {sha[:12]} is not in {repo_name}'s history"
             return
         pinned_at = repo.commit_time(sha)
-        # The whole head commit: an action pin moves to it, and a pin names a commit in full.
+        target_at = repo.commit_time(built) if built else repo.committed
+        # Whole commits: an action pin moves to one, and a pin names a commit in full.
         lag = {"commits": behind, "days": 0.0, "head": repo.sha, "pinned": sha[:12]}
+        if built:
+            lag["built"] = built
         if paths:
-            lag["commits_touching"] = repo.behind(sha, paths)
+            lag["commits_touching"] = repo.behind(sha, paths, upto=upto)
             lag["paths"] = list(paths)
-        if behind and pinned_at and repo.committed:
-            lag["days"] = round((repo.committed - pinned_at).total_seconds() / 86400, 1)
+        if behind and pinned_at and target_at:
+            lag["days"] = round((target_at - pinned_at).total_seconds() / 86400, 1)
         if not repo.on_branch(sha):
             lag["off_branch"] = True
         dep["lag"] = lag
-        dep["upstream"] = {"latest_date": iso(repo.committed), "version_date": iso(pinned_at),
-                           "url": f"{repo.url}/compare/{sha[:12]}...{repo.branch or 'HEAD'}"}
-        if behind and pinned_at and repo.committed:
-            dep["libyears"] = round((repo.committed - pinned_at).total_seconds() / 86400 / 365.25, 2)
+        dep["upstream"] = {"latest_date": iso(target_at), "version_date": iso(pinned_at),
+                           "url": f"{repo.url}/compare/{sha[:12]}...{built[:12] if built else repo.branch or 'HEAD'}"}
+        if behind and pinned_at and target_at:
+            dep["libyears"] = round((target_at - pinned_at).total_seconds() / 86400 / 365.25, 2)
 
     # --- vulnerabilities, across every project at once ------------------------------------
 
