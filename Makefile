@@ -199,7 +199,7 @@ repin:
 	for t in $$(go list tool | grep codesweep-ai); do \
 		owner=$$(echo "$$t" | cut -d/ -f2); repo=$$(echo "$$t" | cut -d/ -f3); \
 		built=$$(curl -fsSL "https://$$owner.github.io/$$repo/ci-status.json" 2>/dev/null | \
-			sed -n 's/^ *"built": *"\([0-9a-f]\{40\}\)".*/\1/p'); \
+			sed -n '/^ "built": {/,/^ }/s/^ *"commit": *"\([0-9a-f]\{40\}\)".*/\1/p'); \
 		if [ -n "$$built" ]; then echo "$$repo: $$(echo "$$built" | cut -c1-7), the last commit its CI passed"; \
 		else echo "$$repo: main, as its CI names no commit it passed"; fi; \
 		pins="$$pins $$t@$${built:-main}"; \
