@@ -5,16 +5,24 @@ Runs inside that repository's Actions job, so it reads only its own runs and the
 job's built-in GITHUB_TOKEN is enough — nothing here reaches another repository.
 """
 
+import base64
 import json
 import os
 import statistics
 import sys
+from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
 SCHEMA = 1
 API = "https://api.github.com"
+# Where the versions a commit was published under are read: Go's module proxy,
+# the container registry and npm's. None of them needs a token for a public
+# project, and none of them is GitHub's rate-limited API.
+GO_PROXY = "https://proxy.golang.org"
+GHCR = "https://ghcr.io"
+NPM = "https://registry.npmjs.org"
 
 # The Pages build GitHub generates for any Pages site is not CI, and not this
 # repository's to report. The runs API gives its display name and the workflows
@@ -35,6 +43,11 @@ FAILED = {"failure", "timed_out", "startup_failure"}
 # dashboard puts first.
 GATE = "ci"
 
+# The workflow that publishes a project's images, where it has one. Something
+# that pins a commit may install its image, so a commit is not built until its
+# images are there.
+IMAGES = "publish images"
+
 
 def api(path, token):
     req = urllib.request.Request(
@@ -50,7 +63,7 @@ def api(path, token):
         return json.load(resp)
 
 
-def built(runs, on_branch):
+def built(runs, on_branch, images=False):
     """The full SHA of the newest push build of the gate that passed, or None.
 
     `runs` is newest first, as the API lists them. `on_branch(sha)` says whether
@@ -58,13 +71,97 @@ def built(runs, on_branch):
     that pins this commit should find it there. A commit that changed nothing CI
     builds has no run, so it is never named, and neither is one whose build failed
     or is still going.
+
+    With `images`, the commit also needs a run of the image workflow that passed.
+    That workflow starts when the gate finishes and records the commit the gate
+    built, so the two runs share the SHA. A skipped run published nothing, and one
+    still going has published nothing yet, so neither counts.
     """
+    published = None
+    if images:
+        published = {r.get("head_sha") for r in runs
+                     if r.get("name") == IMAGES and r.get("conclusion") in PASSED}
     for r in runs:
         sha = r.get("head_sha") or ""
         if (r.get("name") == GATE and r.get("event") == "push"
-                and r.get("conclusion") in PASSED and sha and on_branch(sha)):
+                and r.get("conclusion") in PASSED and sha
+                and (published is None or sha in published) and on_branch(sha)):
             return sha
     return None
+
+
+def built_entry(sha, versions):
+    """The built commit as the file records it, with the versions it was published
+    under, or None where there is none."""
+    return {"commit": sha, "versions": versions(sha)} if sha else None
+
+
+def fetch(url, headers=None):
+    req = urllib.request.Request(url, headers={"User-Agent": "ci-status", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def quietly(read, default):
+    """What read() answers, or default where the answer is not there to have.
+
+    A version this file cannot learn is left out rather than failing the file,
+    which the dashboard needs whether or not a registry answers."""
+    try:
+        return read()
+    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError):
+        return default
+
+
+def module_path(owner, name, ref, token):
+    """The Go module the repository's go.mod declares at ref, or None."""
+    def read():
+        doc = api(f"repos/{owner}/{name}/contents/go.mod?ref={ref}", token)
+        for line in base64.b64decode(doc["content"]).decode().splitlines():
+            f = line.split()
+            if len(f) >= 2 and f[0] == "module":
+                return f[1].strip('"')
+        return None
+    return quietly(read, None)
+
+
+def go_version(module, sha):
+    """The version Go gives commit sha of module, as the module proxy computes it.
+
+    It is what `go get` writes into go.mod for the commit, and what a binary built
+    from a checkout of it reports, so it is the name everything else is published
+    under too. None where the proxy cannot say."""
+    if not module:
+        return None
+    escaped = "".join("!" + c.lower() if c.isupper() else c for c in module)
+    return quietly(lambda: fetch(f"{GO_PROXY}/{escaped}/@v/{sha}.info")["Version"], None)
+
+
+def image_tags(owner, repo):
+    """The tags of the public image ghcr.io/<owner>/<repo>, or [] where there is none."""
+    def read():
+        token = fetch(f"{GHCR}/token?scope=repository:{owner}/{repo}:pull&service=ghcr.io")["token"]
+        return fetch(f"{GHCR}/v2/{owner}/{repo}/tags/list",
+                     {"Authorization": f"Bearer {token}"}).get("tags") or []
+    return quietly(read, [])
+
+
+def npm_versions(package):
+    """Every version npmjs.com holds of package, or [] where it holds none."""
+    return quietly(lambda: list(fetch(
+        f"{NPM}/{package.replace('/', '%2f')}",
+        {"Accept": "application/vnd.npm.install-v1+json"})["versions"]), [])
+
+
+def published(versions, sha):
+    """The version among versions that names commit sha, or None.
+
+    A dev version ends with its commit: twelve characters after a hyphen in a Go
+    pseudo-version, seven after a dot in a version an npm build stamps itself. A
+    per-architecture image tag ends with its architecture instead, so it is never
+    taken for a version."""
+    hits = sorted(v for v in versions if v.endswith("-" + sha[:12]) or v.endswith("." + sha[:7]))
+    return hits[-1] if hits else None
 
 
 def parse_ts(ts):
@@ -94,6 +191,24 @@ def build(owner, name, token, window):
             return False
         return cmp.get("status") in ("ahead", "identical")
 
+    # The versions each commit was published under. The places are named after
+    # the project, as each publishes them: its Go module, its npm package
+    # @<owner>/<name>, and its images, ghcr.io/<owner>/npm/<name> for the npm
+    # package and <name> and <name>-slim for an image of its own. One that does
+    # not exist answers nothing.
+    module = module_path(owner, name, branch, token)
+    images = {repo: image_tags(owner, repo) for repo in (f"npm/{name}", name, f"{name}-slim")}
+    images = {repo: tags for repo, tags in images.items() if tags}
+    packages = {f"@{owner}/{name}": npm_versions(f"@{owner}/{name}")}
+    go = {}
+
+    def versions(sha):
+        return {
+            "go": go.get(sha),
+            "images": {repo: v for repo, tags in images.items() if (v := published(tags, sha))},
+            "npm": {pkg: v for pkg, vs in packages.items() if (v := published(vs, sha))},
+        }
+
     seen = {}
     for r in runs:
         wf = r.get("name") or "(unnamed)"
@@ -112,6 +227,7 @@ def build(owner, name, token, window):
             "attempt": r.get("run_attempt") or 1,
             "actor": (r.get("actor") or {}).get("login") or "",
             "url": r.get("html_url") or "",
+            "commit": r.get("head_sha") or "",
         })
 
     workflows = []
@@ -142,6 +258,18 @@ def build(owner, name, token, window):
 
     # The primary gate leads; the rest follow alphabetically.
     workflows.sort(key=lambda w: (w["name"].lower() != "ci", w["name"].lower()))
+
+    # The versions of the runs the file keeps, and of the built commit. The proxy
+    # takes ten seconds or more over a commit it has not been asked about before,
+    # and then remembers it, so the questions go out together rather than in turn.
+    sha = built(runs, on_branch, images=IMAGES in declared)
+    kept = [e for w in workflows for e in (*w["runs"], w["latest"], w["last_failure"]) if e]
+    commits = sorted({e["commit"] for e in kept if e["commit"]} | ({sha} if sha else set()))
+    if module and commits:
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            go.update(zip(commits, pool.map(lambda c: go_version(module, c), commits)))
+    for e in kept:
+        e["versions"] = versions(e["commit"]) if e["commit"] else {"go": None, "images": {}, "npm": {}}
     return {
         "schema": SCHEMA,
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -154,7 +282,7 @@ def build(owner, name, token, window):
             "branch": branch,
             "pushed_at": meta.get("pushed_at"),
         },
-        "built": built(runs, on_branch),
+        "built": built_entry(sha, versions),
         "workflows": workflows,
     }
 

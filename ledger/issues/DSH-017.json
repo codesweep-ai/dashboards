@@ -15,6 +15,15 @@
   },
   "resolution": null,
   "details": "`make repin` in each project pins its codesweep-ai tools at main's tip, which may be a commit CI failed, is still building, or never built. The status file lists runs with seven-character SHAs, and finding the newest passing push build in it takes a parser. A top-level `built` field holding the full SHA lets a Makefile read it with one `sed`, from Pages rather than the rate-limited API.",
-  "notes": [],
+  "notes": [
+    {
+      "date": "2026-09-23",
+      "text": "A project that publishes images has its commit named as `built` only once its `publish images` run for that commit has passed as well. Something that pins the commit may install its image, and before then there is none."
+    },
+    {
+      "date": "2026-09-23",
+      "text": "`built` is now an object: the commit, and the versions it was published under. Those are its Go module version, its image tags and its npm versions, and every run records the same for its own commit. An npm pin needs the version rather than the SHA, and the history shows what each build published."
+    }
+  ],
   "links": []
 }

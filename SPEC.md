@@ -36,7 +36,10 @@ it up.
     "branch": "main",                // the branch the runs are from
     "pushed_at": "2026-09-09T22:00:00Z"  // copied from the repository, may be null
   },
-  "built": "70fa2864…",              // full SHA of the newest passing push build of ci, or null
+  "built": {                         // the newest passing push build of ci, or null
+    "commit": "70fa2864…",           // its full SHA
+    "versions": { /* see below */ }  // what it was published under
+  },
   "workflows": [ /* see below */ ]
 }
 ```
@@ -71,7 +74,23 @@ Each run:
   "event": "push",
   "attempt": 1,
   "actor": "octocat",
-  "url": "https://github.com/…/actions/runs/123"
+  "url": "https://github.com/…/actions/runs/123",
+  "commit": "70fa2864…",              // the full head SHA
+  "versions": { /* see below */ }     // what that commit was published under
+}
+```
+
+The versions a commit was published under, in `built` and in every run:
+
+```jsonc
+{
+  "go": "v0.0.0-20260923200616-70fa28640a2b",   // Go's version of it, or null
+  "images": {                                   // ghcr.io/<owner>/<repository>: tag
+    "npm/lint": "0.0.0-20260923200616-70fa28640a2b"
+  },
+  "npm": {                                      // package on npmjs.com: version
+    "@codesweep-ai/lint": "0.0.0-20260923200616-70fa28640a2b"
+  }
 }
 ```
 
@@ -111,13 +130,26 @@ for.
 - **At most the 100 most recent runs are read**, in one API page, before the
   window is applied per workflow. A repository that builds often enough to fill
   that page may report fewer than `window` runs for a rarely run workflow.
-- **`built` is the commit a sibling pins.** It is the full SHA of the newest run
+- **`built` is the commit a sibling pins.** Its `commit` is the full SHA of the newest run
   of `ci` that a push started and that passed, among the runs read, provided the
-  branch still holds that commit. A commit that changed nothing CI builds has no
-  run, and a failed or unfinished build is passed over, so `built` may name a
-  commit older than the branch's tip. It is `null` when no run qualifies. A
-  sibling's `make repin` pins its tools to it, reading it with `sed`, so it stays
-  on a line of its own.
+  branch still holds that commit. A project that declares a `publish images`
+  workflow also needs a run of it that passed for that commit, since something
+  that pins the commit may install its image. A commit that changed nothing CI
+  builds has no run, and a failed or unfinished build is passed over, so `built`
+  may name a commit older than the branch's tip. It is `null` when no run
+  qualifies. A sibling's `make repin` pins its tools to it, reading `commit` from
+  inside `built` with `sed`, so each stays on a line of its own.
+- **`versions` says what a commit was published under**, which is what a pin on
+  it names. `go` is the version Go's module proxy gives the commit of the module
+  the repository's `go.mod` declares. It is what `go get` records and what a
+  binary built from the commit reports, and `null` for a project that is no Go
+  module. `images` and `npm` hold every published version whose name ends with
+  the commit, as a dev version's does. That ending is its first twelve
+  characters after a hyphen, or its first seven after a dot. The places are named after the project:
+  images `npm/<name>`, `<name>` and `<name>-slim` under its owner on ghcr.io,
+  and the npm package `@<owner>/<name>`. A place that does not exist, or has
+  nothing for the commit, is left out, and a registry that does not answer
+  leaves its entries out too. None of these lookups goes through GitHub's API.
 - **The Pages build GitHub generates is never reported.** It is not CI, and not
   the repository's to report.
 - **The run writing the file is never reported.** It is in flight while it reads
