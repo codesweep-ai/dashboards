@@ -75,6 +75,21 @@ Because each project publishes independently, the page is explicit about what it
   The age comes from the project's latest `ci` run, not from when its file was written. A project
   that rebuilds its site on a schedule is therefore still flagged once it stops building.
 
+### Green, flaky and recovered
+
+The headline counts the repositories that are green right now, and the line under it says how
+steady they are:
+
+- **Green.** Every workflow's newest finished run passed, which is what a badge says. A repository
+  building on top of a green run stays green until the new run finishes.
+- **Flaky.** A workflow passed under 85% of the runs in its window, and the same commit both failed
+  and went green, or went green on a rerun. A status file keeps only a run's last attempt, so a
+  rerun of a green run counts too.
+- **Recovered.** A workflow passed under 85%, but each failed commit stayed red until a later one
+  fixed it. It needs no attention, so **Needs attention only** hides it.
+- **Steady.** Every workflow passed at least 85%. A card shows its `ci` workflow and folds the other
+  steady ones into one line, and the tiles measure the `ci` workflow alone.
+
 ## The dependencies page
 
 The page says where each project's dependencies stand and what to do about them. It covers Go

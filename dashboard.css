@@ -106,10 +106,31 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   font-weight: var(--font-weight-medium);
   margin-left: var(--space-1);
 }
+/* The breakdown under the figure wraps inside its column rather than pushing the
+   tiles onto a row of their own. The basis is where the column itself wraps. */
+.ci-hero__main { flex: 1 1 22rem; min-width: 0; }
+/* The figure's colour never travels alone: the chips under it carry the word. */
+.ci-hero__figure--good { color: var(--ci-good); }
+.ci-hero__figure--critical { color: var(--ci-critical-text); }
 .ci-hero__note {
   color: var(--muted);
   font-size: var(--font-size-caption);
   margin-top: var(--space-1);
+}
+.ci-hero__breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+}
+.ci-hero__note:empty,
+.ci-hero__breakdown:empty { display: none; }
+.ci-hero__group {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-size: var(--font-size-caption);
+  gap: var(--space-2);
 }
 .ci-hero__tiles {
   display: flex;
@@ -124,6 +145,14 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   line-height: var(--line-height-tight);
 }
 .ci-stat__label { margin-top: var(--space-0-5); }
+/* A workflow's name keeps its case, so ci reads as the workflow, not the page. */
+.ci-stat__label code { text-transform: none; }
+.ci-stat__of {
+  color: var(--muted);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--space-1);
+}
 
 /* --- toolbar --- */
 .ci-toolbar {
@@ -212,8 +241,8 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
 }
 /* Cards differ in height because repos differ in workflow count. The script adds
-   this modifier and gives each card a row span, so a short card no longer
-   reserves the height of the tallest in its row. */
+   this modifier and gives each card a column and a row span, so a short card no
+   longer reserves the height of the tallest in its row. */
 .ci-grid--masonry { grid-auto-rows: 4px; row-gap: 0; }
 
 .ci-card {
@@ -282,6 +311,46 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   white-space: nowrap;
 }
 .ci-wf__empty { color: var(--muted); font-size: var(--font-size-caption); }
+
+/* --- steady workflows, folded under the rows that need reading --- */
+.ci-more > summary {
+  align-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--font-size-caption);
+  gap: var(--space-1) var(--space-2);
+  list-style: none;
+}
+.ci-more > summary::-webkit-details-marker { display: none; }
+.ci-more > summary:hover { color: var(--fg); }
+.ci-more > summary svg {
+  fill: none;
+  flex: none;
+  height: var(--icon-size-xs);
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  transition: transform var(--transition-fast);
+  width: var(--icon-size-xs);
+}
+.ci-more[open] > summary > svg { transform: rotate(90deg); }
+.ci-more__count {
+  align-items: center;
+  color: var(--fg);
+  display: inline-flex;
+  font-weight: var(--font-weight-semibold);
+  gap: var(--space-1);
+}
+.ci-more__count svg { stroke: var(--ci-good); }
+.ci-more__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
 .ci-wf__stats {
   color: var(--muted);
   display: flex;
@@ -296,13 +365,21 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   content: " flaky";
   font-weight: var(--font-weight-semibold);
 }
-.ci-wf__fail {
+.ci-wf__stat--recovered::after {
+  color: var(--ci-good);
+  content: " recovered";
+  font-weight: var(--font-weight-semibold);
+}
+.ci-wf__fail,
+.ci-wf__why {
   color: var(--muted);
   font-size: var(--font-size-caption);
   grid-column: 1 / -1;
 }
-.ci-wf__fail a { color: var(--color-link); }
-.ci-wf__fail a:hover { color: var(--color-link-hover); }
+.ci-wf__fail a,
+.ci-wf__why a { color: var(--color-link); }
+.ci-wf__fail a:hover,
+.ci-wf__why a:hover { color: var(--color-link-hover); }
 
 /* --- chips: geometry from the package's chip component --- */
 .ci-chip {
@@ -328,7 +405,8 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
   stroke-width: 2.1;
   width: var(--icon-size-xs);
 }
-.ci-chip--good { background: var(--ci-good-bg); color: var(--ci-good); }
+.ci-chip--good,
+.ci-chip--recovered { background: var(--ci-good-bg); color: var(--ci-good); }
 .ci-chip--critical { background: var(--ci-critical-bg); color: var(--ci-critical-text); }
 .ci-chip--flaky,
 .ci-chip--running { background: var(--ci-warn-bg); color: var(--ci-warn); }
@@ -395,6 +473,7 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
 .ci-table th.ci-table__num,
 .ci-table td.ci-table__num { font-variant-numeric: tabular-nums; text-align: right; }
 .ci-flag { color: var(--color-warning); font-weight: var(--font-weight-semibold); }
+.ci-flag--recovered { color: var(--ci-good); }
 
 /* --- notices and legend --- */
 .ci-note {
@@ -1056,6 +1135,8 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
 }
 
 @media (max-width: 720px) {
+  /* The tiles wrap under the headline on a phone, and read from its left edge. */
+  .ci-hero__tiles { margin-left: 0; }
   .dp-eco-row { grid-template-columns: 6.5rem 1.5rem 2.5rem 1fr; }
   .dp-grid--actions { grid-template-columns: 1fr; }
   .dp-start__list li { grid-template-columns: 1fr; }

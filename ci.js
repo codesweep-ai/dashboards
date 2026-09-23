@@ -39,12 +39,14 @@
     running: '<svg viewBox="0 0 16 16" aria-hidden="true" class="ci-spin"><path d="M8 2.5a5.5 5.5 0 1 1-5.5 5.5"/></svg>',
     flaky: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 11l3.5-4 4 3 3.5-5"/></svg>',
     idle: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg>',
-    unreachable: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4.5v4m0 2.5v.5"/></svg>'
+    unreachable: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4.5v4m0 2.5v.5"/></svg>',
+    chevron: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg>',
+    recovered: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 11.5l7-7m-5 0h5v5"/></svg>'
   };
 
   var REPO_LABEL = {
-    good: "all green", critical: "failing", running: "running",
-    flaky: "flaky", idle: "no runs", unreachable: "unreachable"
+    good: "all green", critical: "failing", running: "running", flaky: "flaky",
+    recovered: "recovered", idle: "no runs", unreachable: "unreachable"
   };
 
   // --- small helpers ------------------------------------------------------
@@ -126,29 +128,72 @@
       : { at: p.generated, label: "status published" };
   }
 
+  // The newest run of a workflow that reached a verdict. A run in flight, cancelled
+  // or skipped says nothing about whether the tip builds, so it is looked past.
+  function verdict(w) {
+    var runs = w.runs || [];
+    for (var i = 0; i < runs.length; i++) {
+      var b = bucket(runs[i].state);
+      if (b === "good" || b === "critical") return b;
+    }
+    return null;
+  }
+
+  // Why a workflow sits under the flaky line, from its runs in the window. A commit
+  // that both failed and passed, or passed on a rerun, is flakiness. A commit that
+  // never passed was broken, and when the workflow is green a later commit fixed
+  // it. The file keeps only a run's last attempt, so a rerun of a run that passed
+  // looks the same as a rerun of one that failed, and both count as flaky here.
+  function health(w) {
+    if (w.pass_rate == null || w.pass_rate >= FLAKY_BELOW) return null;
+    var failed = {}, passed = {}, reruns = [];
+    (w.runs || []).forEach(function (r) {
+      var b = bucket(r.state);
+      if (b === "critical" && r.sha) failed[r.sha] = r;
+      if (b === "good" && r.sha) passed[r.sha] = r;
+      if (b === "good" && r.attempt > 1) reruns.push(r);
+    });
+    var shas = Object.keys(failed);
+    var both = shas.filter(function (s) { return passed[s]; }).map(function (s) { return failed[s]; });
+    var broke = shas.length - both.length;
+    var fixed = verdict(w) === "good";
+    return {
+      kind: both.length || reruns.length ? "flaky" : fixed ? "recovered" : null,
+      both: both, reruns: reruns, broke: broke, fixed: fixed
+    };
+  }
+
   function summarise(p) {
-    var buckets = [], rates = [];
+    var verdicts = [], running = false, rates = [];
     p.workflows.forEach(function (w) {
-      if (w.latest) buckets.push(bucket(w.latest.state));
+      w.health = health(w);
+      var v = verdict(w);
+      if (v) verdicts.push(v);
+      if (w.latest && bucket(w.latest.state) === "running") running = true;
       if (w.pass_rate != null) rates.push(w.pass_rate);
     });
     // The weakest workflow sets the tone: a repo is only as good as its worst gate.
     p.pass_rate = rates.length ? Math.min.apply(null, rates) : null;
-    p.flaky = p.workflows.filter(function (w) {
-      return w.pass_rate != null && w.pass_rate < FLAKY_BELOW;
+    p.flaky = p.workflows.filter(function (w) { return w.health && w.health.kind === "flaky"; });
+    p.recovered = p.workflows.filter(function (w) {
+      return w.health && w.health.kind === "recovered";
     });
     p.built = lastBuilt(p);
     p.staleHours = hoursSince(p.built.at);
+    // Green right now is what a badge says: every workflow's newest verdict passed.
+    // A flaky repo is green, and so is one building on top of a green verdict.
+    p.green = !p.unreachable && verdicts.length > 0 && !has(verdicts, "critical");
     p.state = p.unreachable ? "unreachable"
-      : has(buckets, "critical") ? "critical"
-      : has(buckets, "running") ? "running"
+      : has(verdicts, "critical") ? "critical"
+      : running ? "running"
       : p.flaky.length ? "flaky"
-      : has(buckets, "good") ? "good"
+      : p.recovered.length ? "recovered"
+      : verdicts.length ? "good"
       : "idle";
     return p;
   }
 
-  var ORDER = { critical: 0, flaky: 1, running: 2, unreachable: 3, idle: 4, good: 5 };
+  var ORDER = { critical: 0, flaky: 1, running: 2, unreachable: 3, idle: 4, recovered: 5, good: 6 };
 
   // --- render -------------------------------------------------------------
 
@@ -174,9 +219,9 @@
         '<span class="ci-chip ci-chip--idle">' + ICON.idle + "never run</span>" +
         '<span class="ci-wf__path">' + esc(w.path || "declared in the repo") + "</span></div>";
     }
-    var b = bucket(w.latest.state), stats = [];
+    var b = bucket(w.latest.state), stats = [], kind = w.health && w.health.kind;
     if (w.pass_rate != null) {
-      stats.push('<span class="ci-wf__stat' + (w.pass_rate < FLAKY_BELOW ? " ci-wf__stat--flaky" : "") +
+      stats.push('<span class="ci-wf__stat' + (kind ? " ci-wf__stat--" + kind : "") +
         '"><b>' + w.pass_rate + "%</b> of " + w.counted + "</span>");
     }
     if (w.median_duration != null) {
@@ -197,7 +242,40 @@
       (STATE_LABEL[w.latest.state] || w.latest.state) + "</a>" +
       '<span class="ci-wf__when">' + esc(fmtAgo(w.latest.started)) + "</span>" +
       strip(w) +
-      '<span class="ci-wf__stats">' + stats.join("") + "</span>" + fail + "</div>";
+      '<span class="ci-wf__stats">' + stats.join("") + "</span>" + why(w.health) + fail + "</div>";
+  }
+
+  // The evidence behind a flaky or recovered rate, so a reader can check the call.
+  function why(h) {
+    if (!h || !h.kind) return "";
+    function commit(r) {
+      return '<a href="' + esc(r.url) + '" target="_blank" rel="noopener"><code>' +
+        esc(String(r.sha).slice(0, 7)) + "</code></a>";
+    }
+    var parts = h.both.slice(0, 3).map(function (r) { return commit(r) + " failed and passed"; })
+      .concat(h.reruns.slice(0, 3).map(function (r) { return commit(r) + " passed on a rerun"; }));
+    if (h.broke) {
+      parts.push(h.broke + (h.broke === 1 ? " failed commit" : " failed commits") +
+        (h.fixed ? (h.broke === 1 ? ", fixed by a later one" : ", each fixed by a later one") : ""));
+    }
+    return '<div class="ci-wf__why">' + parts.join(" · ") + "</div>";
+  }
+
+  // Steady: the newest verdict passed, nothing is in flight, and the pass rate
+  // clears the flaky line. Such a row says nothing a reader has to act on.
+  function steady(w) {
+    return !!w.latest && bucket(w.latest.state) !== "running" && verdict(w) === "good" &&
+      w.pass_rate != null && w.pass_rate >= FLAKY_BELOW;
+  }
+
+  // The steady rows fold into one line, so a card is as tall as what needs reading.
+  function more(list, after) {
+    return '<details class="ci-more"><summary>' + ICON.chevron +
+      '<span class="ci-more__count">' + ICON.good + list.length +
+      (after ? " more" : list.length === 1 ? " workflow" : " workflows") + ", all steady</span>" +
+      '<span class="ci-more__names">' + esc(list.map(function (w) { return w.name; }).join(", ")) +
+      '</span></summary><div class="ci-more__body">' + list.map(workflowRow).join("") +
+      "</div></details>";
   }
 
   function card(p) {
@@ -209,7 +287,16 @@
         "not be read (" + esc(p.unreachable) + ").</p>" +
         '<footer class="ci-card__foot"><code>' + esc(p.url) + "</code></footer></article>";
     }
-    var rows = p.workflows.map(workflowRow);
+    // The primary gate stays out, so every card keeps one strip to read at a glance.
+    var shown = [], folded = [], never = [];
+    p.workflows.forEach(function (w) {
+      if (!w.latest) never.push(w);
+      else if (steady(w) && w.name.toLowerCase() !== PRIMARY_GATE) folded.push(w);
+      else shown.push(w);
+    });
+    var rows = shown.map(workflowRow);
+    if (folded.length) rows.push(more(folded, shown.length));
+    rows = rows.concat(never.map(workflowRow));
     if (p.state === "idle") {
       rows.push('<div class="ci-wf__empty" data-empty="1" hidden>every workflow here has never run</div>');
     }
@@ -231,8 +318,9 @@
   function tableRow(p, w) {
     var state = w.latest ? w.latest.state : "never run";
     var b = w.latest ? bucket(w.latest.state) : "idle";
+    var kind = w.health && w.health.kind;
     var rate = w.pass_rate == null ? "—"
-      : w.pass_rate + "%" + (w.pass_rate < FLAKY_BELOW ? '<span class="ci-flag"> flaky</span>' : "");
+      : w.pass_rate + "%" + (kind ? '<span class="ci-flag ci-flag--' + kind + '"> ' + kind + "</span>" : "");
     return '<tr data-state="' + p.state + '"' + (w.latest ? "" : ' data-never="1"') + ">" +
       "<td>" + esc(p.name) + "</td><td>" + esc(w.name) + "</td>" +
       '<td><span class="ci-chip ci-chip--' + b + '">' + ICON[b] +
@@ -245,6 +333,68 @@
       "<td>" + (w.last_failure ? esc(fmtAgo(w.last_failure.started)) : "—") + "</td></tr>";
   }
 
+  // The figure answers one question: is every repository green right now? A flaky
+  // repo is, so it counts. The line under the figure splits the green into steady
+  // and flaky and names whatever is not green, so the figure carries one claim.
+  function hero(live, window_) {
+    var green = live.filter(function (p) { return p.green; });
+    var flaky = green.filter(function (p) { return p.flaky.length; });
+    var recovered = green.filter(function (p) { return !p.flaky.length && p.recovered.length; });
+    var steady = green.length - flaky.length - recovered.length;
+    var failing = live.filter(function (p) { return p.state === "critical"; });
+    var unbuilt = live.filter(function (p) { return !p.green && p.state !== "critical"; });
+    var building = green.filter(function (p) { return p.state === "running"; });
+
+    function group(state, label, names) {
+      return '<span class="ci-hero__group"><span class="ci-chip ci-chip--' + state + '">' +
+        ICON[state] + esc(label) + "</span>" + (names ? "<span>" + names + "</span>" : "") +
+        "</span>";
+    }
+    function named(list) {
+      return list.map(function (p) { return "<b>" + esc(p.name) + "</b>"; }).join(", ");
+    }
+    // Each repo with the workflows that put it in its group, and their pass rates.
+    function rates(list, key) {
+      return list.map(function (p) {
+        return "<b>" + esc(p.name) + "</b> " + p[key].map(function (w) {
+          return esc(w.name) + " " + w.pass_rate + "%";
+        }).join(", ");
+      }).join(" · ");
+    }
+
+    var groups = [], foot = [], under = "under " + FLAKY_BELOW + "% of the last " + window_ + " runs";
+    if (failing.length) groups.push(group("critical", failing.length + " failing", named(failing)));
+    if (unbuilt.length) groups.push(group("idle", unbuilt.length + " not built yet", named(unbuilt)));
+    if (flaky.length) {
+      groups.push(group("flaky", flaky.length + " flaky", rates(flaky, "flaky")));
+      foot.push("Flaky: " + under + ", and a commit both failed and passed, or passed on a rerun.");
+    }
+    if (recovered.length) {
+      groups.push(group("recovered", recovered.length + " recovered", rates(recovered, "recovered")));
+      foot.push("Recovered: " + (flaky.length ? "under " + FLAKY_BELOW + "% too" : under) +
+        ", but each failed commit stayed red until a later one fixed it.");
+    }
+    if (steady) groups.push(group("good", steady + " steady"));
+    if (live.length && steady === live.length) {
+      foot.push("Every workflow passed at least " + FLAKY_BELOW + "% of its last " +
+        window_ + " runs.");
+    }
+    if (building.length) {
+      foot.push(building.length + " building now, counted by " +
+        (building.length === 1 ? "its last finished run." : "their last finished runs."));
+    }
+
+    var fig = document.getElementById("hero");
+    fig.className = "ci-hero__figure" + (!live.length ? ""
+      : failing.length ? " ci-hero__figure--critical"
+      : green.length === live.length ? " ci-hero__figure--good" : "");
+    fig.innerHTML = green.length + '<span class="ci-hero__of">of ' + live.length + "</span>";
+    document.getElementById("hero-note").textContent = live.length
+      ? "repositories green right now" : "no project published a status";
+    document.getElementById("hero-breakdown").innerHTML = groups.join("");
+    document.getElementById("hero-foot").textContent = foot.join(" ");
+  }
+
   function render(projects) {
     projects.sort(function (a, b) {
       return (ORDER[a.state] - ORDER[b.state]) ||
@@ -253,36 +403,24 @@
     });
 
     var live = projects.filter(function (p) { return !p.unreachable; });
-    var green = live.filter(function (p) { return p.state === "good"; }).length;
-    var flaky = live.filter(function (p) { return p.state === "flaky"; }).length;
-    var broken = live.filter(function (p) { return p.state === "critical"; }).length;
-    var runs = 0, fails = 0, wfCount = 0, window_ = null;
+    // The tiles measure the primary gate alone. Housekeeping workflows such as
+    // pages pass nearly every time, and counting them would lift the rate.
+    var runs = 0, fails = 0, window_ = null;
     live.forEach(function (p) {
       window_ = window_ || p.window;
       p.workflows.forEach(function (w) {
-        wfCount++;
-        if (w.counted) { runs += w.counted; fails += w.failures; }
+        if (w.name.toLowerCase() === PRIMARY_GATE && w.counted) {
+          runs += w.counted;
+          fails += w.failures;
+        }
       });
     });
-    var overall = runs ? Math.round(100 * (runs - fails) / runs) + "%" : "—";
 
-    var note;
-    if (!live.length) note = "no project published a status";
-    else if (green === live.length) note = "every workflow green, and steady across the window";
-    else {
-      var parts = [];
-      if (broken) parts.push(broken + " failing now");
-      if (flaky) parts.push(flaky + " green now but under " + FLAKY_BELOW + "% across the window");
-      note = parts.join(" · ") || (live.length - green) + " need attention";
-    }
-
-    document.getElementById("hero").innerHTML =
-      green + '<span class="ci-hero__of">of ' + live.length + "</span>";
-    document.getElementById("hero-note").textContent = "repositories green right now — " + note;
-    document.getElementById("stat-pass").textContent = overall;
-    document.getElementById("stat-failed").textContent = fails;
-    document.getElementById("stat-runs").textContent = runs;
-    document.getElementById("stat-workflows").textContent = wfCount;
+    hero(live, window_);
+    document.getElementById("stat-pass").textContent =
+      runs ? Math.round(100 * (runs - fails) / runs) + "%" : "—";
+    document.getElementById("stat-failed").innerHTML =
+      runs ? fails + '<span class="ci-stat__of">of ' + runs + "</span>" : "—";
     document.getElementById("window").textContent = window_ || "—";
     document.getElementById("generated").textContent = new Date().toLocaleString();
 
@@ -330,16 +468,43 @@
     var showNever = document.getElementById("show-never");
     var rows = table.querySelectorAll("tbody tr");
     var ROW = 4, GAP = 16;               // must match .ci-grid--masonry and --space-4
+    var placed = null;                   // the column each card went to, by name
 
-    // Give every visible card a row span matching its own height, so cards pack
-    // upwards instead of each row growing to its tallest member.
-    function layout() {
+    // Place every visible card in a column, in sorted order, each spanning rows to
+    // match its height, so cards pack upwards instead of each row growing to its
+    // tallest member. A card goes to the leftmost column that is level with the
+    // shortest, give or take half a card, so the cards read left to right as rows
+    // do. A column clearly shorter than the rest takes the next card, which keeps
+    // holes out of the middle. With more cards than a row holds, some column ends
+    // short, and this puts it at the bottom right, where it reads as the end.
+    //
+    // keep leaves each card in its column and only restacks the columns, so that
+    // opening a card's steady rows does not send its neighbours elsewhere.
+    function layout(keep) {
       if (cards.hidden) return;
-      Array.prototype.forEach.call(cards.children, function (c) {
-        c.style.gridRowEnd = "";
-        if (c.hidden) return;
-        c.style.gridRowEnd = "span " + Math.ceil((c.getBoundingClientRect().height + GAP) / ROW);
+      var cols = getComputedStyle(cards).gridTemplateColumns.split(" ").length;
+      var shown = Array.prototype.filter.call(cards.children, function (c) {
+        if (c.hidden) c.style.gridColumn = c.style.gridRow = "";
+        return !c.hidden;
       });
+      var spans = shown.map(function (c) {
+        return Math.ceil((c.getBoundingClientRect().height + GAP) / ROW);
+      });
+      var slack = spans.slice().sort(function (a, b) { return a - b; })[spans.length >> 1] / 2;
+      var tops = [], reuse = keep && placed && placed.cols === cols, next = { cols: cols };
+      for (var i = 0; i < cols; i++) tops.push(0);
+      shown.forEach(function (c, i) {
+        var col = reuse ? placed[c.dataset.name] : null;
+        if (col == null) {
+          var low = Math.min.apply(null, tops);
+          for (col = 0; tops[col] > low + slack; col++) { /* the leftmost level column */ }
+        }
+        next[c.dataset.name] = col;
+        c.style.gridColumn = String(col + 1);
+        c.style.gridRow = (tops[col] + 1) + " / span " + spans[i];
+        tops[col] += spans[i];
+      });
+      placed = next;
     }
 
     function view(showTable) {
@@ -352,13 +517,16 @@
     vCards.addEventListener("click", function () { view(false); });
     vTable.addEventListener("click", function () { view(true); });
 
+    // A recovered repo is green with its failures fixed, so it needs no attention.
+    function calm(el) { return el.dataset.state === "good" || el.dataset.state === "recovered"; }
+
     // One filter row scopes both views, so switching between them keeps the slice.
     function applyFilters() {
       var bad = onlyBad.getAttribute("aria-pressed") === "true";
       // Off by default: never-run rows are collapsed until the toggle is pressed.
       var never = showNever.getAttribute("aria-pressed") !== "true";
       Array.prototype.forEach.call(cards.children, function (c) {
-        c.hidden = bad && c.dataset.state === "good";
+        c.hidden = bad && calm(c);
         var shown = 0;
         c.querySelectorAll(".ci-wf").forEach(function (wf) {
           wf.hidden = never && wf.dataset.never === "1";
@@ -367,7 +535,7 @@
         c.querySelectorAll("[data-empty]").forEach(function (el) { el.hidden = shown > 0; });
       });
       Array.prototype.forEach.call(rows, function (r) {
-        r.hidden = (bad && r.dataset.state === "good") || (never && r.dataset.never === "1");
+        r.hidden = (bad && calm(r)) || (never && r.dataset.never === "1");
       });
       layout();
     }
@@ -380,9 +548,14 @@
 
     cards.classList.add("ci-grid--masonry");
     applyFilters();
-    addEventListener("resize", layout);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
-    window.__ciLayout = layout;
+    addEventListener("resize", function () { layout(); });
+    // Opening a card's steady rows changes its height. toggle does not bubble, so
+    // the grid listens for it on the way down.
+    cards.addEventListener("toggle", function () { layout(true); }, true);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { layout(); });
+    }
+    window.__ciLayout = function () { layout(); };
   }
 
   // --- theme: the three modes the package's useTheme hook defines ----------
