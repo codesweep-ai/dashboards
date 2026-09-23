@@ -1,0 +1,22 @@
+{
+  "id": "DSH-016",
+  "title": "tracer's ui sync installs the new build but leaves the committed viewer stale",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "session agent, auditing pilot2-improvements.md item 3 after the user asked: \"Add the missing parts of SAC-056, item 3 and item 5.\"",
+  "opened": "2026-09-22",
+  "resolved": null,
+  "stint": "ui-sync-steps",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "The report's `tracer:sync:ui-npm-codesweep-ai-ui` action has one step, `npm install --save-exact @codesweep-ai/ui@<version>` in `apps/viewer`. Tracer commits the viewer that build produces under `internal/cli/viewer/`, and the binary embeds it. Run as printed, the action moves the pin and leaves the committed viewer built from the old version. Tracer's CI then fails its `viewer artifacts are current` job, which rebuilds the viewer and compares it with what is committed. Its local `make ci` has no such comparison, so the gate the action is checked against does not catch it.\n\n`deps-config.json` gives ledger's and campaign's ui syncs the rebuild steps they need, which DSH-012 added, and names nothing for tracer. The forks' report generated at 2026-09-22T23:46:55Z carries the one-step action, because tracer's pin is one ui build behind.",
+  "notes": [],
+  "links": [
+    "DSH-012"
+  ]
+}
