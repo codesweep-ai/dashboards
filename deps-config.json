@@ -103,6 +103,13 @@
    "steps": [
     {"run": "make viewer-build", "cwd": "."}
    ]
+  },
+  {
+   "project": "tracer",
+   "name": "@codesweep-ai/ui",
+   "steps": [
+    {"run": "make viewer-build", "cwd": "."}
+   ]
   }
  ],
  "licenses": {

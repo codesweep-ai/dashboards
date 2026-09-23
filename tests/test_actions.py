@@ -174,5 +174,30 @@ class Ledger(unittest.TestCase):
         self.assertNotIn("internal/ledger", [s.get("cwd") for s in act["steps"]])
 
 
+# tracer and campaign commit the viewer their ui build produces, and the binary
+# embeds it, so a move that only installs leaves the committed viewer stale.
+UI_BUILD = "0.3.1-dev.20260922233547.67ef1cf"
+UI_BEHIND = {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
+    "commits": 4, "head": "67ef1cf11c130f524597e0b99beabf739899ab16", "version": UI_BUILD}}}
+
+
+class Tracer(unittest.TestCase):
+    def test_a_ui_move_rebuilds_the_committed_viewer_after_the_install(self):
+        act = document(fixture("tracer", UI_BEHIND))["tracer:sync:ui-npm-codesweep-ai-ui"]
+        self.assertEqual(act["steps"], [
+            {"run": f"npm install --save-exact @codesweep-ai/ui@{UI_BUILD}", "cwd": "apps/viewer"},
+            {"run": "make viewer-build", "cwd": "."},
+        ])
+
+
+class Campaign(unittest.TestCase):
+    def test_a_ui_move_rebuilds_the_committed_page_after_the_install(self):
+        act = document(fixture("campaign", UI_BEHIND))["campaign:sync:ui-npm-codesweep-ai-ui"]
+        self.assertEqual(act["steps"], [
+            {"run": f"npm install --save-exact @codesweep-ai/ui@{UI_BUILD}", "cwd": "dispatch-viewer/app"},
+            {"run": "make viewer-build", "cwd": "."},
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()

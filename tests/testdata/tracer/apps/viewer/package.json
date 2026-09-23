@@ -1,0 +1,9 @@
+{
+  "name": "cs-tracer-viewer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@codesweep-ai/ui": "0.3.1-dev.20260922213837.7d44127",
+    "react": "^18.3.1"
+  }
+}
