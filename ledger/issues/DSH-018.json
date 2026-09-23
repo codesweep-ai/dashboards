@@ -1,0 +1,22 @@
+{
+  "id": "DSH-018",
+  "title": "The dependencies page counts a pin on a sibling's last build as behind",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "user report (host): \"we don't want these situations to show on that dashboard appearing like the dependent is behind its dependency, as it's not in that case, it's on the latest built version of the dependency.\"",
+  "opened": "2026-09-23",
+  "resolved": null,
+  "stint": "last-green-pins",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "The collector measures a pin on a sibling against the sibling's branch head: `lag.commits` counts every commit between the two. `make repin` now pins to the sibling's last commit its CI built and passed, which its status file names as `built`. The head moves past that commit whenever a push is still building, failed, or changed nothing CI builds. A pin exactly where repin put it then reads as behind, and its sync step moves it to an unbuilt commit.",
+  "notes": [],
+  "links": [
+    "DSH-017"
+  ]
+}
