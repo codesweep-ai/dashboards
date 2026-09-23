@@ -189,10 +189,22 @@ oss:
 ledger:
 	go tool cs-ledger check ledger
 
-## repin: move the pinned tools to their latest release
+## repin: move each pinned tool to its last green commit or its latest release
+##
+## A codesweep-ai tool moves to the commit its project names as `built` in the
+## ci-status.json it publishes (SPEC.md), and to its branch tip where the file
+## cannot be read or names none. The others move to their newest release.
 repin:
-	go get -tool github.com/codesweep-ai/lint/cmd/cs-lint@latest
-	go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@latest
+	@pins=""; \
+	for t in $$(go list tool | grep codesweep-ai); do \
+		owner=$$(echo "$$t" | cut -d/ -f2); repo=$$(echo "$$t" | cut -d/ -f3); \
+		built=$$(curl -fsSL "https://$$owner.github.io/$$repo/ci-status.json" 2>/dev/null | \
+			sed -n 's/^ *"built": *"\([0-9a-f]\{40\}\)".*/\1/p'); \
+		if [ -n "$$built" ]; then echo "$$repo: $$(echo "$$built" | cut -c1-7), the last commit its CI passed"; \
+		else echo "$$repo: main, as its CI names no commit it passed"; fi; \
+		pins="$$pins $$t@$${built:-main}"; \
+	done; \
+	go get -tool $$pins
 	go get -tool github.com/rhysd/actionlint/cmd/actionlint@latest
 	go get -tool golang.org/x/vuln/cmd/govulncheck@latest
 	go mod tidy
