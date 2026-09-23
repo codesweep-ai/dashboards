@@ -23,6 +23,12 @@ def main():
         if key not in data["repo"]:
             sys.exit(f"{path}: missing repo.{key}")
 
+    # SPEC.md: the full SHA of the newest passing push build of ci, or null. A
+    # sibling's `make repin` reads it with sed, so the spelling matters.
+    b = data.get("built")
+    if b is not None and not (isinstance(b, str) and len(b) == 40 and all(c in "0123456789abcdef" for c in b)):
+        sys.exit(f"{path}: built is {b!r}, wanted a full lower-case SHA or null")
+
     names = [w["name"] for w in data["workflows"]]
     # SPEC.md: the run writing the file is in flight while it reads the API, and
     # reporting it would put a workflow that never finishes on the card.

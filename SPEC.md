@@ -36,6 +36,7 @@ it up.
     "branch": "main",                // the branch the runs are from
     "pushed_at": "2026-09-09T22:00:00Z"  // copied from the repository, may be null
   },
+  "built": "70fa2864…",              // full SHA of the newest passing push build of ci, or null
   "workflows": [ /* see below */ ]
 }
 ```
@@ -110,6 +111,13 @@ for.
 - **At most the 100 most recent runs are read**, in one API page, before the
   window is applied per workflow. A repository that builds often enough to fill
   that page may report fewer than `window` runs for a rarely run workflow.
+- **`built` is the commit a sibling pins.** It is the full SHA of the newest run
+  of `ci` that a push started and that passed, among the runs read, provided the
+  branch still holds that commit. A commit that changed nothing CI builds has no
+  run, and a failed or unfinished build is passed over, so `built` may name a
+  commit older than the branch's tip. It is `null` when no run qualifies. A
+  sibling's `make repin` pins its tools to it, reading it with `sed`, so it stays
+  on a line of its own.
 - **The Pages build GitHub generates is never reported.** It is not CI, and not
   the repository's to report.
 - **The run writing the file is never reported.** It is in flight while it reads

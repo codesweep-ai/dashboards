@@ -31,6 +31,10 @@ SKIP_RUN_ID = os.environ.get("GITHUB_RUN_ID")
 PASSED = {"success"}
 FAILED = {"failure", "timed_out", "startup_failure"}
 
+# The workflow whose passing build a sibling may pin: the primary gate, which the
+# dashboard puts first.
+GATE = "ci"
+
 
 def api(path, token):
     req = urllib.request.Request(
@@ -44,6 +48,23 @@ def api(path, token):
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
+
+
+def built(runs, on_branch):
+    """The full SHA of the newest push build of the gate that passed, or None.
+
+    `runs` is newest first, as the API lists them. `on_branch(sha)` says whether
+    the commit is still on the branch, which a force-push can undo: a sibling
+    that pins this commit should find it there. A commit that changed nothing CI
+    builds has no run, so it is never named, and neither is one whose build failed
+    or is still going.
+    """
+    for r in runs:
+        sha = r.get("head_sha") or ""
+        if (r.get("name") == GATE and r.get("event") == "push"
+                and r.get("conclusion") in PASSED and sha and on_branch(sha)):
+            return sha
+    return None
 
 
 def parse_ts(ts):
@@ -64,6 +85,14 @@ def build(owner, name, token, window):
     runs = api(
         f"repos/{owner}/{name}/actions/runs?branch={branch}&per_page=100", token
     )["workflow_runs"]
+
+    def on_branch(sha):
+        # The branch is ahead of the commit, or is the commit: either way it holds it.
+        try:
+            cmp = api(f"repos/{owner}/{name}/compare/{sha}...{branch}", token)
+        except urllib.error.HTTPError:
+            return False
+        return cmp.get("status") in ("ahead", "identical")
 
     seen = {}
     for r in runs:
@@ -125,6 +154,7 @@ def build(owner, name, token, window):
             "branch": branch,
             "pushed_at": meta.get("pushed_at"),
         },
+        "built": built(runs, on_branch),
         "workflows": workflows,
     }
 
