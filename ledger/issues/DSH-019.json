@@ -3,17 +3,19 @@
   "title": "`built` passes over a build whose image run GitHub lists under a later commit",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "session agent, while tracing which commit ui's publish images runs record",
   "opened": "2026-09-23",
-  "resolved": null,
+  "resolved": "2026-09-23",
   "stint": "last-green-pins",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "bdffc5c"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "The action's tests pass, including test_images_count_for_the_commit_they_name_not_the_run. The live status files of lint, ledger, npmrevs, ui and sandbox each list their newest build, found by the version the registry holds."
   },
-  "resolution": null,
+  "resolution": "A commit counts as built once ci passed on it and, for a project with images, the registry holds its version. No run is paired with another.",
   "details": "A run that `ci` finishing starts is listed under whatever commit is main's head by then, not the commit `ci` built. `built` pairs a `publish images` run with a `ci` run by that listed commit. A fix is then never named when a ledger-only push lands while its `ci` runs. Its image run is listed under the ledger commit, which has no `ci` run. A commit can also be credited with another's images. Push C, then D while C's `ci` runs: C's image run is listed under D, even if D's own fails. In ui, the image run started by one commit's `ci` finishing was listed under the next commit, pushed while that `ci` ran. `built` also reads only the newest 100 runs of every workflow together, so enough `ledger` and `pages` runs push the last `ci` pass out of view.",
   "notes": [
     {

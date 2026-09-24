@@ -1,10 +1,10 @@
 {
-  "recommendedBy": "session agent, while building this repository",
-  "updated": "2026-09-10",
+  "recommendedBy": "session agent",
+  "updated": "2026-09-23",
   "items": [
     {
-      "id": "DSH-001",
-      "why": "Nothing else here is visible to a reader until a project publishes a status file."
+      "id": "DSH-003",
+      "why": "The next placeholder on the index, and every repository already produces its data."
     }
   ]
 }

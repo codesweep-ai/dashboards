@@ -3,17 +3,19 @@
   "title": "dashboards publishes no status file, so a pin on its action has no build to move to",
   "type": "improvement",
   "severity": "low",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "user choice (host), answering where a pin on the dashboards action should move: \"dashboards publishes built\"",
   "opened": "2026-09-23",
-  "resolved": null,
+  "resolved": "2026-09-23",
   "stint": "last-green-pins",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "bdffc5c"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "codesweep-ai.github.io/dashboards/ci-status.json is live in schema 2 and lists bdffc5c first in `built`. Every sibling's pages workflow pins the action at that commit."
   },
-  "resolution": null,
+  "resolution": "The site's pages workflow writes this repository's own status file after ci or ledger finishes, so a pin on the action moves to a build like any other.",
   "details": "Every project's `pages.yml` pins `codesweep-ai/dashboards/action` by commit, and a repin moves that pin like any other. The other projects publish a `ci-status.json` that lists the commits their CI built, and a pin moves only to one of those. This site publishes none, so a pin on the action has nothing to move to but main's tip, which may not have built.",
   "notes": [],
   "links": [

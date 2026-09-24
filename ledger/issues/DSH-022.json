@@ -3,17 +3,19 @@
   "title": "The dependencies page moves a pin to the head when its sibling lists no build",
   "type": "defect",
   "severity": "low",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "user report (host): \"also make the deps dashboard hold instead of moving to head\"",
   "opened": "2026-09-23",
-  "resolved": null,
+  "resolved": "2026-09-23",
   "stint": "last-green-pins",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "bdffc5c"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "The collector's tests pass, including test_without_a_last_build_a_pin_is_held and test_a_held_sibling_pin_is_no_action."
   },
-  "resolution": null,
+  "resolution": "A pin whose sibling lists no build is held. Its status is `held`, `lag.held` says why, and no action moves it.",
   "details": "A pin on a sibling whose status file lists no build, or names one off its branch, is measured against the sibling's head. The page then counts it behind, and its sync step moves the pin to the head, which may never have built. `make repin` and oss-repin hold such a pin where it is instead.",
   "notes": [],
   "links": [
