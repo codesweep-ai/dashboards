@@ -1,0 +1,20 @@
+{
+  "id": "DSH-025",
+  "title": "The status action leaves go.mod and a refused API response open",
+  "type": "defect",
+  "severity": "low",
+  "status": "open",
+  "foundBy": "agent review (session): ResourceWarnings in the collector's and action's test run",
+  "opened": "2026-09-24",
+  "resolved": null,
+  "stint": "npm-repins",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "In its own job the action reads the checkout's `go.mod` with a bare `open()`, and never closes the file. Where the compare API answers 404 or 422, the handler returns without closing the error response, which holds the connection. Python reports both as a ResourceWarning in the test run. Neither changes what the status file says, since the job ends soon after.",
+  "notes": [],
+  "links": []
+}

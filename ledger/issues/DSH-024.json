@@ -1,0 +1,22 @@
+{
+  "id": "DSH-024",
+  "title": "The ledger's ui move lists by hand the steps `make viewer-repin` now takes",
+  "type": "improvement",
+  "severity": "low",
+  "status": "open",
+  "foundBy": "agent review (session): ledger's new `make viewer-repin` covers the steps deps-config.json lists for its ui pin",
+  "opened": "2026-09-24",
+  "resolved": null,
+  "stint": "npm-repins",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "For ledger's `@codesweep-ai/ui` pin, deps-config.json names `internal/ledger/render.go`'s `UIVersion` as a second place the pin is written. After the install it lists four more steps: raise `RendererVersion` by hand, `make viewer-build build`, render both ledgers, and edit the sample line in MANUAL.md. Ledger's `make viewer-repin` now does all of it, and a test in ledger holds `UIVersion` to the pin. A person who follows the page's steps does by hand what one target does, and can miss the version bump that target makes.",
+  "notes": [],
+  "links": [
+    "DSH-023"
+  ]
+}
