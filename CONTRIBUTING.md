@@ -187,6 +187,11 @@ make ledger
 `ledger/AGENTS.md` routes to the guide, and `cs-ledger guide` prints the
 doctrine from inside the binary.
 
+A push to main that changes only `ledger/` does not run `ci`. The `ledger`
+workflow runs `make ledger`, `make prose`, `make refs` and `make oss` instead,
+and the site republishes when it finishes. Such a commit has no `ci` run, so
+the status file never lists it as built.
+
 ## Changing the action
 
 A project pins the action to a commit:
