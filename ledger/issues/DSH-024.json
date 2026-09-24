@@ -3,17 +3,19 @@
   "title": "The ledger's ui move lists by hand the steps `make viewer-repin` now takes",
   "type": "improvement",
   "severity": "low",
-  "status": "open",
+  "status": "closed",
   "foundBy": "agent review (session): ledger's new `make viewer-repin` covers the steps deps-config.json lists for its ui pin",
   "opened": "2026-09-24",
-  "resolved": null,
+  "resolved": "2026-09-24",
   "stint": "npm-repins",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "f94340d"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "test_the_ui_pin_installs_and_viewer_repin_carries_it_through passes. A collector run over ledger and ui listed two steps for ledger's ui pin: the install through `scripts/with-npmrevs.sh`, then `make viewer-repin`. ci run 36064180914 passed."
   },
-  "resolution": null,
+  "resolution": "deps-config.json names `make viewer-repin` as the one step after ledger's ui install. It no longer lists `UIVersion` as a second place the pin is written, since the target sets it and ledger's test holds it to the pin.",
   "details": "For ledger's `@codesweep-ai/ui` pin, deps-config.json names `internal/ledger/render.go`'s `UIVersion` as a second place the pin is written. After the install it lists four more steps: raise `RendererVersion` by hand, `make viewer-build build`, render both ledgers, and edit the sample line in MANUAL.md. Ledger's `make viewer-repin` now does all of it, and a test in ledger holds `UIVersion` to the pin. A person who follows the page's steps does by hand what one target does, and can miss the version bump that target makes.",
   "notes": [],
   "links": [
