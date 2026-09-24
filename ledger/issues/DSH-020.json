@@ -1,0 +1,22 @@
+{
+  "id": "DSH-020",
+  "title": "dashboards publishes no status file, so a pin on its action has no build to move to",
+  "type": "improvement",
+  "severity": "low",
+  "status": "in-progress",
+  "foundBy": "user choice (host), answering where a pin on the dashboards action should move: \"dashboards publishes built\"",
+  "opened": "2026-09-23",
+  "resolved": null,
+  "stint": "last-green-pins",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "Every project's `pages.yml` pins `codesweep-ai/dashboards/action` by commit, and a repin moves that pin like any other. The other projects publish a `ci-status.json` that lists the commits their CI built, and a pin moves only to one of those. This site publishes none, so a pin on the action has nothing to move to but main's tip, which may not have built.",
+  "notes": [],
+  "links": [
+    "DSH-017"
+  ]
+}
