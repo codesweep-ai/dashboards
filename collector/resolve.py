@@ -151,13 +151,21 @@ class Resolver:
                 # The version to install is the one built from the commit the pin moves
                 # to. Its status file says which npm version that build published; a
                 # dist-tag names whichever build was tagged last, which can be older.
+                # The Pages run npm's own run starts can read npmjs.com before the
+                # version is listed there, and a build npm never published is listed
+                # nowhere. The build's npm image carries the version all the same.
                 to = lag["built"]
-                named = ((self.built.get(repo) or {}).get("versions") or {}).get("npm") or {}
-                built = [named[name]] if lag.get("built") and named.get(name) else \
+                published = (self.built.get(repo) or {}).get("versions") or {}
+                named = (published.get("npm") or {}).get(name)
+                built = [named] if named else \
                     [v for v in self.src.npm_versions(name) or []
                      if versions.pseudo(v) and to.startswith(versions.pseudo(v)[1])]
+                imaged = (published.get("images") or {}).get("npm/" + name.rsplit("/", 1)[-1])
                 if built:
                     lag["version"] = built[-1]
+                elif imaged:
+                    lag["version"] = imaged
+                    lag["image_only"] = True
             return
         info = self.src.npm_version(name, version) if version else {}
         top = self.src.npm_version(name, latest["version"]) if latest["version"] else {}

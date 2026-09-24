@@ -207,6 +207,32 @@ class Resolve(unittest.TestCase):
             version="0.0.0-20260905000000-bda511aea589", internal=True, datasource="npm"))
         self.assertEqual((d["lag"]["commits"], d["lag"]["version"]), (5, "0.0.0-20260910000000-c0ffee00c0ff"))
 
+    def test_where_npm_lists_no_version_yet_the_builds_image_names_it(self):
+        # The Pages run npm's own run starts read npmjs.com before the version it
+        # had just published was listed, so the file names it under the image alone.
+        image = "0.0.0-20260910000000-c0ffee00c0ff"
+        src = FakeSources(npm_latest={"version": "0.0.0-20260901000000-129b17f78d58",
+                                      "repository": "git+https://github.com/codesweep-ai/ledger.git"},
+                          npm_versions=["0.0.0-20260901000000-129b17f78d58"])
+        built = {"ledger": {"commit": self.BUILT, "versions": {"images": {"npm/ledger": image}, "npm": {}}}}
+        d = resolver(src, {"ledger": FakeRepo(behind={"HEAD": 8, self.BUILT: 5})}, built).resolve(dep(
+            ecosystem="npm", name="@codesweep-ai/ledger", package="@codesweep-ai/ledger", scope="dev",
+            version="0.0.0-20260905000000-bda511aea589", internal=True, datasource="npm"))
+        self.assertEqual((d["lag"]["version"], d["lag"].get("image_only")), (image, True))
+
+    def test_a_version_npmjs_lists_is_not_only_the_images(self):
+        # The file's npm entry is missing, but npmjs.com lists the build by now.
+        version = "0.0.0-20260910000000-c0ffee00c0ff"
+        src = FakeSources(npm_latest={"version": "0.0.0-20260901000000-129b17f78d58",
+                                      "repository": "git+https://github.com/codesweep-ai/ledger.git"},
+                          npm_versions=[version])
+        built = {"ledger": {"commit": self.BUILT, "versions": {"images": {"npm/ledger": version}, "npm": {}}}}
+        d = resolver(src, {"ledger": FakeRepo(behind={"HEAD": 8, self.BUILT: 5})}, built).resolve(dep(
+            ecosystem="npm", name="@codesweep-ai/ledger", package="@codesweep-ai/ledger", scope="dev",
+            version="0.0.0-20260905000000-bda511aea589", internal=True, datasource="npm"))
+        self.assertEqual(d["lag"]["version"], version)
+        self.assertNotIn("image_only", d["lag"])
+
     def test_an_internal_image_links_to_the_namespace_it_is_named_in(self):
         tags = ["v0.0.0-20260910000000-aaaaaaaaaaaa", "v0.0.0-20260901000000-bbbbbbbbbbbb"]
         r = resolve.Resolver(FakeSources(oci_tags=tags), "alice", {}, NOW)

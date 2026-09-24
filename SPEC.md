@@ -455,7 +455,8 @@ Each record in `dependencies` has this shape:
            "head": "d687ad5b27750000…",   // the whole commit the sibling's default branch is at
            "built": "a48d212425fe0000…",  // the sibling's last passing build: the first its status file names
            "pinned": "4c204c69b8b2",
-           "version": "0.3.1-dev.20260922202805.27eb21f",   // npm: the registry's build of that commit
+           "version": "0.3.1-dev.20260922202805.27eb21f",   // npm: the version that commit's build published
+           "image_only": true,            // npm: npmjs.com lists no such version yet, and the build's image carries it
            "builds": 3,                   // an image: newer tier builds, in place of commits
            "held": "ledger lists no build",   // why nothing moves the pin, when its status is `held`
            "off_branch": true },          // the pinned commit is not on the default branch
@@ -494,6 +495,7 @@ Each record in `dependencies` has this shape:
                     "stars": 44592 },
   "provenance": true,                // published with a build attestation
   "install_script": true,            // npm runs a script when it installs this package
+  "installer": "scripts/with-npmrevs.sh",   // npm, internal: the script the project's installs run through
   "opened": "2026-08-13T21:43:54Z",  // when a security or end-of-life gap opened
   "sla": { "since": "…", "due": "…", "days": 7, "state": "breached" },  // only with a policy
   "accepted": { "reason": "not_used", "note": "…", "until": "2026-12-01T00:00:00Z",
@@ -867,9 +869,14 @@ https://codesweep.ai/dashboards/deps-actions.json
   beside it holds a tool's requirements, and tidy would add the directory's packages to it.
 - **A sibling pin moves to one commit, and no other pin moves with it.** That commit is `lag.built`,
   and a `held` pin, which has none, gets no step. A Go `sync` runs `go get <module>@<commit>` in each module file that pins it, with the tool's command as above. An
-  npm `sync` installs `lag.version`, the build the registry holds of that commit. A dist-tag names
-  whichever build was tagged last, which can be older than the pin. Until the registry holds the build,
-  the step says so instead.
+  npm `sync` installs `lag.version`, the version that commit's build published. A dist-tag names
+  whichever build was tagged last, which can be older than the pin. The status file names the version,
+  or npmjs.com lists it, or the build's `npm/<name>` image carries it, in that order. The Pages run that
+  npm's own run starts can read npmjs.com before the version is listed. A build npm never published is
+  listed nowhere. So the image can be the only place that holds it, which is `lag.image_only`. A
+  project that carries `scripts/with-npmrevs.sh` names it as its `installer`, and the install runs
+  through it, since cs-npmrevs serves the image's version as well. A project without it installs from
+  npmjs.com, so an image-only build gets a step that says to wait for npmjs.com instead.
 - **`requires` orders the work.** An action comes after every action it requires, in the file as in time.
 - **`options` is a choice for a person.** The collector recommends one and picks none. An agent proposes
   the recommended option, and makes none of them unasked.

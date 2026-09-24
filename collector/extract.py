@@ -16,6 +16,10 @@ from . import versions
 # Directories whose manifests describe something other than the project: test
 # inputs, recorded traffic, and copies of other repositories' files.
 SKIP_DIRS = {"node_modules", "testdata", "cassettes", "examples", "vendor", ".git"}
+# What a project that installs through cs-npmrevs carries. It serves the org's
+# packages from the images every build publishes, so it installs a version
+# npmjs.com does not list yet, or never will.
+NPMREVS = "scripts/with-npmrevs.sh"
 
 ECOSYSTEMS = ("go", "npm", "pypi", "actions", "runtime", "image", "package", "native")
 
@@ -728,6 +732,10 @@ def repository(repo, org, pins=(), after=()):
                                                 and u["line"] == rec["sources"][0]["line"])]
 
     deps = merge(deps)
+    if NPMREVS in fileset:
+        for d in deps:
+            if d["ecosystem"] == "npm" and d.get("internal"):
+                d["installer"] = NPMREVS
     for rule in after:
         for d in deps:
             if d["name"] == rule["name"] and d["scope"] not in ("indirect", "transitive"):

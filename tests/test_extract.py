@@ -47,7 +47,28 @@ tool (
         self.assertEqual(by(deps, "golang.org/x/tools/gopls")[0]["sources"][0]["tools"], ["golang.org/x/tools/gopls"])
 
 
+class Files:
+    """A repository of these paths and texts, as extract.repository reads one."""
+
+    def __init__(self, files):
+        self._files = files
+
+    def files(self):
+        return sorted(self._files)
+
+    def read(self, rel):
+        return self._files.get(rel)
+
+
 class Npm(unittest.TestCase):
+    def test_a_project_that_installs_through_npmrevs_names_it_on_its_own_packages(self):
+        pkg = json.dumps({"dependencies": {"@codesweep-ai/ui": "0.3.1-dev.20260922213837.7d44127", "react": "18.3.1"}})
+        with_script = extract.repository(Files({"apps/viewer/package.json": pkg, "scripts/with-npmrevs.sh": "#!/bin/sh\n"}), ORG)
+        installer = {d["name"]: d.get("installer") for d in with_script["dependencies"]}
+        self.assertEqual(installer, {"@codesweep-ai/ui": "scripts/with-npmrevs.sh", "react": None})
+        without = extract.repository(Files({"apps/viewer/package.json": pkg}), ORG)
+        self.assertEqual([d.get("installer") for d in without["dependencies"]], [None, None])
+
     def test_each_installed_package_names_the_declared_dependencies_that_bring_it_in(self):
         pkg = json.dumps({"dependencies": {"a": "^1.0.0", "w": "*"}, "devDependencies": {"b": "^1.0.0"}})
         lock = json.dumps({"packages": {

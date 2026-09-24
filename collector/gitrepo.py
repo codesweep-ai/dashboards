@@ -31,6 +31,9 @@ SPARSE = [
     "/manifests/",
     "/charts/",
     "*.ABOUT",
+    # Not a manifest: a project that carries it installs through cs-npmrevs,
+    # which is how its npm steps can reach a version only an image holds.
+    "/scripts/with-npmrevs.sh",
 ]
 
 

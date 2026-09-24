@@ -6,6 +6,7 @@ The page renders actions and an agent follows them, so both read the same
 decisions from the file rather than re-deriving them.
 """
 
+import posixpath
 import re
 from datetime import datetime
 
@@ -214,12 +215,16 @@ def _each_place(d, sources, in_modfile, v):
     return steps
 
 
-def _npm_places(d, sources, cmd, v):
-    """`cmd` in each directory whose manifest or lockfile holds the package, and an edit anywhere else it is written."""
+def _npm_places(d, sources, cmd, v, via=None):
+    """`cmd` in each directory whose manifest or lockfile holds the package, and an edit anywhere else it is written.
+
+    `via` is a script, by its path in the project, that the command runs under."""
     steps = []
     for s in sources:
         manifest = s["path"].rsplit("/", 1)[-1] in ("package.json", "package-lock.json")
-        step = {"run": cmd, "cwd": dir_of(s["path"])} if manifest else _set_at(d, s, v)
+        cwd = dir_of(s["path"])
+        run = f"{posixpath.relpath(via, cwd)} {cmd}" if via else cmd
+        step = {"run": run, "cwd": cwd} if manifest else _set_at(d, s, v)
         if step not in steps:
             steps.append(step)
     return steps
@@ -252,11 +257,13 @@ def _own_steps(d, to=None):
             return _each_place(d, sources, lambda s: _go_get(d, s, head), head)
         if d["ecosystem"] == "npm" and head:
             built = d["lag"].get("version")
-            if not built:
+            # A version only the build's image holds installs through cs-npmrevs
+            # alone, so a project without its script waits for npmjs.com.
+            if not built or (d["lag"].get("image_only") and not d.get("installer")):
                 return [{"do": f"Install the build of {d['name']} made from commit {head[:12]} once the registry holds it: "
                                f"`npm view {d['name']} versions --json` lists them."}]
             return _npm_places(d, sources, f"npm install --save-exact {'-D ' if d.get('scope') == 'dev' else ''}{d['name']}@{built}",
-                               built)
+                               built, d.get("installer"))
         if d["ecosystem"] == "actions":
             return edit(f"uses: {d['name']}@{head or '<newest commit>'}", **{"from": (d.get("lag") or {}).get("pinned"), "to": head})
         if d["ecosystem"] == "image":

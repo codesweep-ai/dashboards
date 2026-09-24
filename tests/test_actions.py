@@ -180,7 +180,7 @@ class Ledger(unittest.TestCase):
             "built": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": built}}})
         act = document(p)["ledger:sync:ui-npm-codesweep-ai-ui"]
         self.assertEqual(act["steps"][:2], [
-            {"run": f"npm install --save-exact @codesweep-ai/ui@{built}", "cwd": "viewer"},
+            {"run": f"../scripts/with-npmrevs.sh npm install --save-exact @codesweep-ai/ui@{built}", "cwd": "viewer"},
             {"edit": "internal/ledger/render.go", "line": 6, "text": f"set the version to {built}",
              "from": "0.3.1-dev.20260909170256.1638d27", "to": built},
         ])
@@ -200,16 +200,34 @@ class Tracer(unittest.TestCase):
     def test_a_ui_move_rebuilds_the_committed_viewer_after_the_install(self):
         act = document(fixture("tracer", UI_BEHIND))["tracer:sync:ui-npm-codesweep-ai-ui"]
         self.assertEqual(act["steps"], [
-            {"run": f"npm install --save-exact @codesweep-ai/ui@{UI_BUILD}", "cwd": "apps/viewer"},
+            {"run": f"../../scripts/with-npmrevs.sh npm install --save-exact @codesweep-ai/ui@{UI_BUILD}", "cwd": "apps/viewer"},
             {"run": "make viewer-build", "cwd": "."},
         ])
+
+
+class ImageOnly(unittest.TestCase):
+    # npmjs.com lists no version of the build yet, and its npm image carries one.
+    LAG = {"commits": 4, "head": "67ef1cf11c130f524597e0b99beabf739899ab16",
+           "built": "67ef1cf11c130f524597e0b99beabf739899ab16", "version": UI_BUILD, "image_only": True}
+
+    def test_a_project_with_npmrevs_installs_it_from_the_image(self):
+        facts = {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": self.LAG}}
+        act = document(fixture("tracer", facts))["tracer:sync:ui-npm-codesweep-ai-ui"]
+        self.assertEqual(act["steps"][0], {"run": f"../../scripts/with-npmrevs.sh npm install --save-exact @codesweep-ai/ui@{UI_BUILD}",
+                                           "cwd": "apps/viewer"})
+
+    def test_a_project_without_it_waits_for_npmjs(self):
+        facts = {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": self.LAG}}
+        act = document(fixture("npm-project", facts))["npm-project:sync:ui-npm-codesweep-ai-ui"]
+        self.assertEqual(len(act["steps"]), 1)
+        self.assertIn("once the registry holds it", act["steps"][0]["do"])
 
 
 class Campaign(unittest.TestCase):
     def test_a_ui_move_rebuilds_the_committed_page_after_the_install(self):
         act = document(fixture("campaign", UI_BEHIND))["campaign:sync:ui-npm-codesweep-ai-ui"]
         self.assertEqual(act["steps"], [
-            {"run": f"npm install --save-exact @codesweep-ai/ui@{UI_BUILD}", "cwd": "dispatch-viewer/app"},
+            {"run": f"../../scripts/with-npmrevs.sh npm install --save-exact @codesweep-ai/ui@{UI_BUILD}", "cwd": "dispatch-viewer/app"},
             {"run": "make viewer-build", "cwd": "."},
         ])
 
