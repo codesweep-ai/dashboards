@@ -76,15 +76,15 @@ def _ts(iso):
 
 def pin_commit(lag):
     """The commit a pin on a sibling moves to: the sibling's last passing build, as its
-    status file names it, or its branch head where it names none."""
-    return lag.get("built") or lag.get("head")
+    status file names it. A sibling that names none holds the pin, so nothing moves it."""
+    return lag.get("built")
 
 
 def target(d):
     """The version a record's newest release, or its fix, names."""
     up = d.get("upstream") or {}
     if (d.get("lag") or {}).get("head"):
-        return d["lag"].get("version") or pin_commit(d["lag"])[:7]
+        return d["lag"].get("version") or (pin_commit(d["lag"]) or "")[:7] or None
     if d.get("status") == "vulnerable" and d.get("fix") and not up.get("latest"):
         return d["fix"]
     return up.get("latest") or d.get("fix")

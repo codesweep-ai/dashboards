@@ -13,11 +13,19 @@
 # The dependencies dashboard is why this site builds on a schedule. What it
 # reports moves without anyone committing, so every run reads the world again,
 # and the schedule refreshes facts rather than a timestamp.
+#
+# The site also carries this repository's own ci-status.json, as each sibling's
+# does. Its `built` names the commits of this repository a project may pin the
+# action at. So the site builds when a push's build has finished, rather than on
+# the push: ci runs for a push that changes anything outside ledger/, and
+# ledger.yml for one that changes the ledger. Built on the push, the file would
+# report ci still running, and nothing would rewrite it until the next run.
 name: pages
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [ci, ledger]
+    types: [completed]
   # Daily, at a minute nobody else picks. The page flags data older than 36
   # hours, which is a missed day plus slack: GitHub disables a schedule in a
   # repository with no activity for 60 days, and that is how it would show.
@@ -36,12 +44,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ci.yml runs on pull_request as well as on push, and workflow_run fires for
+  # either. A run started that way still builds main, so a pull request's ci
+  # would only publish the same site again for nothing. The event is what tells
+  # them apart: a fork's branch can be called main too. The build waits on both
+  # jobs, so it is skipped with them.
   ci-dashboard:
     name: CI dashboard
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     uses: ./.github/workflows/dashboard-ci.yml
 
   deps-dashboard:
     name: dependencies dashboard
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == github.event.repository.default_branch)
     uses: ./.github/workflows/dashboard-deps.yml
 
   build:
@@ -49,8 +70,28 @@ jobs:
     needs: [ci-dashboard, deps-dashboard]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read # the site is built from the tree and nothing is written back
+      actions: read # the status file is this repository's own workflow runs
     steps:
+      # The branch's history without its file contents, beyond what the site is
+      # built from: the status file asks git whether each build it lists is
+      # still on the branch, rather than asking GitHub's API.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      # This repository's own status file, written by the action in this tree,
+      # as the one a sibling pins writes its. Jekyll copies it into the site like
+      # any other file at the repository root. A failure here costs this
+      # repository its own status, not the dashboards every project reads, so the
+      # site still publishes, and the step shows as failed.
+      - name: write the CI status
+        uses: ./action
+        continue-on-error: true
+        with:
+          window: "20"
 
       - uses: actions/setup-node@v4
         with:

@@ -8,14 +8,16 @@ job's built-in GITHUB_TOKEN is enough — nothing here reaches another repositor
 import base64
 import json
 import os
+import re
 import statistics
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-SCHEMA = 1
+SCHEMA = 2
 API = "https://api.github.com"
 # Where the versions a commit was published under are read: Go's module proxy,
 # the container registry and npm's. None of them needs a token for a public
@@ -45,8 +47,18 @@ GATE = "ci"
 
 # The workflow that publishes a project's images, where it has one. Something
 # that pins a commit may install its image, so a commit is not built until its
-# images are there.
+# images are there. The registry says so: the run cannot, since GitHub lists a
+# run that ci's finishing started under whatever commit was main's head by then.
 IMAGES = "publish images"
+
+# How many built commits the file names. A sibling pins the newest, and a repin
+# that pushed a commit waits for it to appear here.
+BUILT_KEEP = 10
+
+# How many passing gate runs are looked at for them. A commit older than the
+# branch's newest 100 costs a compare call to place, and the job's token has
+# 1,000 requests an hour, spent several times a push.
+BUILT_SCAN = 30
 
 
 def api(path, token):
@@ -63,37 +75,42 @@ def api(path, token):
         return json.load(resp)
 
 
-def built(runs, on_branch, images=False):
-    """The full SHA of the newest push build of the gate that passed, or None.
+def built(runs, on_branch, imaged=None, keep=BUILT_KEEP, scan=BUILT_SCAN):
+    """The full SHAs of the newest push builds of the gate that passed, newest
+    first, at most `keep` of them, from the newest `scan` such runs.
 
-    `runs` is newest first, as the API lists them. `on_branch(sha)` says whether
-    the commit is still on the branch, which a force-push can undo: a sibling
-    that pins this commit should find it there. A commit that changed nothing CI
-    builds has no run, so it is never named, and neither is one whose build failed
-    or is still going.
+    `runs` are the gate's runs, newest first, as the API lists them. A commit
+    built more than once is named once. `on_branch(sha)` says whether the commit
+    is still on the branch, which a force-push can undo: a sibling that pins this
+    commit should find it there. A commit that changed nothing CI builds has no
+    run, so it is never named, and neither is one whose build failed or is still
+    going.
 
-    With `images`, the commit also needs a run of the image workflow that passed.
-    That workflow starts when the gate finishes and records the commit the gate
-    built, so the two runs share the SHA. A skipped run published nothing, and one
-    still going has published nothing yet, so neither counts.
+    With `imaged`, the commit also needs `imaged(sha)` to say its images are
+    out: the registry holds its version. One whose images failed, are still
+    being pushed, or have been pruned since is passed over.
     """
-    published = None
-    if images:
-        published = {r.get("head_sha") for r in runs
-                     if r.get("name") == IMAGES and r.get("conclusion") in PASSED}
+    shas, seen = [], set()
     for r in runs:
         sha = r.get("head_sha") or ""
-        if (r.get("name") == GATE and r.get("event") == "push"
-                and r.get("conclusion") in PASSED and sha
-                and (published is None or sha in published) and on_branch(sha)):
-            return sha
-    return None
+        if not (r.get("name") == GATE and r.get("event") == "push"
+                and r.get("conclusion") in PASSED and sha) or sha in seen:
+            continue
+        seen.add(sha)
+        if len(seen) > scan:
+            break
+        # The registry first: it costs no call to GitHub, and a compare can.
+        if (imaged is None or imaged(sha)) and on_branch(sha):
+            shas.append(sha)
+            if len(shas) >= keep:
+                break
+    return shas
 
 
 def built_entry(sha, versions):
-    """The built commit as the file records it, with the versions it was published
-    under, or None where there is none."""
-    return {"commit": sha, "versions": versions(sha)} if sha else None
+    """A built commit as the file records it, with the versions it was published
+    under."""
+    return {"commit": sha, "versions": versions(sha)}
 
 
 def fetch(url, headers=None):
@@ -113,16 +130,96 @@ def quietly(read, default):
         return default
 
 
+def own_run(owner, name):
+    """Whether this runs in a job of owner/name itself, whose checkout and event
+    can answer what would otherwise cost an API call."""
+    return os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("GITHUB_REPOSITORY") == f"{owner}/{name}"
+
+
 def module_path(owner, name, ref, token):
-    """The Go module the repository's go.mod declares at ref, or None."""
-    def read():
-        doc = api(f"repos/{owner}/{name}/contents/go.mod?ref={ref}", token)
-        for line in base64.b64decode(doc["content"]).decode().splitlines():
+    """The Go module the repository's go.mod declares at ref, or None. In the
+    repository's own job, the checkout's go.mod answers."""
+    def parse(text):
+        for line in text.splitlines():
             f = line.split()
             if len(f) >= 2 and f[0] == "module":
                 return f[1].strip('"')
         return None
+    local = os.path.join(os.environ.get("GITHUB_WORKSPACE", "."), "go.mod")
+    if own_run(owner, name):
+        return quietly(lambda: parse(open(local).read()), None) if os.path.isfile(local) else None
+
+    def read():
+        doc = api(f"repos/{owner}/{name}/contents/go.mod?ref={ref}", token)
+        return parse(base64.b64decode(doc["content"]).decode())
     return quietly(read, None)
+
+
+def workspace():
+    return os.environ.get("GITHUB_WORKSPACE", ".")
+
+
+def declared_workflows(owner, name, token):
+    """The repository's active workflows, by name, each with its path. In its own
+    job the checkout's .github/workflows answers, a file named by its top-level
+    `name:` or, as GitHub names one without it, its path. GitHub's flag for a
+    workflow switched off by hand is not in the tree, so such a one is listed
+    too."""
+    if own_run(owner, name):
+        found = {}
+        top = os.path.join(workspace(), ".github", "workflows")
+        for f in sorted(os.listdir(top)) if os.path.isdir(top) else []:
+            if not f.endswith((".yml", ".yaml")):
+                continue
+            path = f".github/workflows/{f}"
+            wf = path
+            with open(os.path.join(top, f)) as fh:
+                for line in fh:
+                    m = re.match(r"^name:\s*(.*?)\s*$", line)
+                    if m:
+                        value = m.group(1)
+                        if value[:1] in "\"'":
+                            value = value[1:value.find(value[0], 1)]
+                        else:
+                            value = value.split(" #")[0].strip()
+                        wf = value or path
+                        break
+            found[wf] = {"name": wf, "path": path, "state": "active"}
+        return {n: w for n, w in found.items() if n not in SKIP_WORKFLOWS}
+    return {
+        w["name"]: w
+        for w in api(f"repos/{owner}/{name}/actions/workflows", token).get("workflows", [])
+        if w.get("state") == "active" and w["name"] not in SKIP_WORKFLOWS
+    }
+
+
+def local_history():
+    """Whether the checkout holds the branch's history, so git can say which
+    commits are on it."""
+    try:
+        out = subprocess.run(["git", "-C", workspace(), "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return out == "false"
+
+
+def repo_meta(owner, name, token):
+    """The repository's default branch, description, URL and last push. In its
+    own job, the event that started the run carries them."""
+    if own_run(owner, name):
+        try:
+            with open(os.environ["GITHUB_EVENT_PATH"]) as fh:
+                repo = json.load(fh).get("repository") or {}
+            if repo.get("default_branch"):
+                pushed = repo.get("pushed_at")
+                if isinstance(pushed, (int, float)):
+                    # A push event gives it in epoch seconds.
+                    repo["pushed_at"] = datetime.fromtimestamp(pushed, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                return repo
+        except (KeyError, OSError, ValueError):
+            pass
+    return api(f"repos/{owner}/{name}", token)
 
 
 def go_version(module, sha):
@@ -141,7 +238,9 @@ def image_tags(owner, repo):
     """The tags of the public image ghcr.io/<owner>/<repo>, or [] where there is none."""
     def read():
         token = fetch(f"{GHCR}/token?scope=repository:{owner}/{repo}:pull&service=ghcr.io")["token"]
-        return fetch(f"{GHCR}/v2/{owner}/{repo}/tags/list",
+        # The registry pages a long list, and prune-images keeps each repository
+        # far below this.
+        return fetch(f"{GHCR}/v2/{owner}/{repo}/tags/list?n=1000",
                      {"Authorization": f"Bearer {token}"}).get("tags") or []
     return quietly(read, [])
 
@@ -171,25 +270,62 @@ def parse_ts(ts):
 
 
 def build(owner, name, token, window):
-    meta = api(f"repos/{owner}/{name}", token)
+    meta = repo_meta(owner, name, token)
     branch = meta.get("default_branch") or "main"
 
-    declared = {
-        w["name"]: w
-        for w in api(f"repos/{owner}/{name}/actions/workflows", token).get("workflows", [])
-        if w.get("state") == "active" and w["name"] not in SKIP_WORKFLOWS
-    }
+    declared = declared_workflows(owner, name, token)
     runs = api(
         f"repos/{owner}/{name}/actions/runs?branch={branch}&per_page=100", token
     )["workflow_runs"]
 
+    # Whether a commit is still on the branch. In the repository's own job a
+    # checkout with its history answers, the branch's head being what it checked
+    # out. Otherwise the branch's recent commits, asked for once, answer for
+    # nearly every commit, and one older than those is compared against the
+    # branch.
+    #
+    # A lookup that fails for any reason but the commit's being unknown stops the
+    # file rather than passing a build over: a `built` that silently lost its
+    # newest entry would move a sibling's pin back.
+    local = own_run(owner, name) and local_history()
+    branch_shas = None
+
     def on_branch(sha):
+        nonlocal branch_shas
+        if local:
+            return subprocess.run(["git", "-C", workspace(), "merge-base", "--is-ancestor", sha, "HEAD"],
+                                  capture_output=True).returncode == 0
+        if branch_shas is None:
+            branch_shas = {c.get("sha") for c in api(f"repos/{owner}/{name}/commits?sha={branch}&per_page=100", token)}
+        if sha in branch_shas:
+            return True
         # The branch is ahead of the commit, or is the commit: either way it holds it.
         try:
             cmp = api(f"repos/{owner}/{name}/compare/{sha}...{branch}", token)
-        except urllib.error.HTTPError:
-            return False
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 422):
+                return False
+            raise
         return cmp.get("status") in ("ahead", "identical")
+
+    # A commit's images are out once every image repository the project
+    # publishes to holds its version, read from the tag lists fetched below,
+    # with no call to GitHub. The version tag goes last in each: an npm
+    # package's wrapper after its platform packages, and a sandbox version's
+    # list only once both architectures are in. A registry that does not answer
+    # lists no repository, and names no build.
+    def images_published(sha):
+        return bool(images) and all(published(tags, sha) for tags in images.values())
+
+    # The gate's passing push runs, from the history read above. Every other
+    # workflow's runs share that page, and a long enough stretch of pushes that
+    # change only the ledger can push every one of the gate's out of it. Only
+    # then are the gate's own runs asked for.
+    gate_runs = [r for r in runs if r.get("name") == GATE]
+    if GATE in declared and not any(r.get("event") == "push" and r.get("conclusion") in PASSED for r in gate_runs):
+        gate_file = os.path.basename(declared[GATE].get("path") or "") or "ci.yml"
+        gate_runs = api(f"repos/{owner}/{name}/actions/workflows/{gate_file}/runs"
+                        f"?branch={branch}&event=push&status=success&per_page=100", token)["workflow_runs"]
 
     # The versions each commit was published under. The places are named after
     # the project, as each publishes them: its Go module, its npm package
@@ -262,9 +398,9 @@ def build(owner, name, token, window):
     # The versions of the runs the file keeps, and of the built commit. The proxy
     # takes ten seconds or more over a commit it has not been asked about before,
     # and then remembers it, so the questions go out together rather than in turn.
-    sha = built(runs, on_branch, images=IMAGES in declared)
+    shas = built(gate_runs, on_branch, imaged=images_published if IMAGES in declared else None)
     kept = [e for w in workflows for e in (*w["runs"], w["latest"], w["last_failure"]) if e]
-    commits = sorted({e["commit"] for e in kept if e["commit"]} | ({sha} if sha else set()))
+    commits = sorted({e["commit"] for e in kept if e["commit"]} | set(shas))
     if module and commits:
         with ThreadPoolExecutor(max_workers=16) as pool:
             go.update(zip(commits, pool.map(lambda c: go_version(module, c), commits)))
@@ -282,7 +418,7 @@ def build(owner, name, token, window):
             "branch": branch,
             "pushed_at": meta.get("pushed_at"),
         },
-        "built": built_entry(sha, versions),
+        "built": [built_entry(sha, versions) for sha in shas],
         "workflows": workflows,
     }
 
@@ -305,7 +441,10 @@ def main():
     try:
         data = build(owner, name, token, window)
     except urllib.error.HTTPError as exc:
-        sys.exit(f"ci-status: {slug}: HTTP {exc.code} {exc.reason}")
+        limited = " (rate limited)" if exc.headers.get("X-RateLimit-Remaining") == "0" else ""
+        sys.exit(f"ci-status: {slug}: HTTP {exc.code} {exc.reason}{limited}")
+    except (urllib.error.URLError, OSError) as exc:
+        sys.exit(f"ci-status: {slug}: {exc}")
 
     text = json.dumps(data, indent=1, sort_keys=False) + "\n"
     if out == "-":

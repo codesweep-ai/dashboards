@@ -26,8 +26,8 @@ def main():
     with open(path) as fh:
         data = json.load(fh)
 
-    if data.get("schema") != 1:
-        sys.exit(f"{path}: unexpected schema {data.get('schema')!r}, wanted 1")
+    if data.get("schema") != 2:
+        sys.exit(f"{path}: unexpected schema {data.get('schema')!r}, wanted 2")
     for key in REQUIRED:
         if key not in data:
             sys.exit(f"{path}: missing {key}")
@@ -35,14 +35,19 @@ def main():
         if key not in data["repo"]:
             sys.exit(f"{path}: missing repo.{key}")
 
-    # SPEC.md: the newest passing build, or null, and the versions each commit was
-    # published under. A sibling's `make repin` reads built.commit with sed, so
-    # the spelling matters.
-    b = data.get("built")
-    if b is not None:
+    # SPEC.md: the newest passing builds, newest first and each once, and the
+    # versions each commit was published under. A sibling's `make repin` reads the
+    # first commit in built with sed, so the spelling matters.
+    built = data.get("built")
+    if not isinstance(built, list) or len(built) > 10:
+        sys.exit(f"{path}: built is {built!r}, wanted a list of at most 10 builds")
+    for b in built:
         if not isinstance(b, dict) or not is_sha(b.get("commit")):
-            sys.exit(f"{path}: built is {b!r}, wanted an object with a full lower-case commit, or null")
+            sys.exit(f"{path}: built holds {b!r}, wanted an object with a full lower-case commit")
         check_versions(path, "built", b.get("versions"))
+    commits = [b["commit"] for b in built]
+    if len(set(commits)) != len(commits):
+        sys.exit(f"{path}: built names a commit more than once")
     for wf in data["workflows"]:
         for run in wf["runs"]:
             if run.get("commit") and not is_sha(run["commit"]):

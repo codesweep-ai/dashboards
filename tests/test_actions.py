@@ -65,14 +65,15 @@ class GoProject(unittest.TestCase):
             {"edit": "image/Containerfile.base", "line": 8, "text": "set the version to v0.50.0", "from": "v0.49.0", "to": "v0.50.0"},
         ])
 
-    def test_a_sibling_pin_moves_to_its_head_commit_and_nothing_else(self):
+    def test_a_held_sibling_pin_is_no_action(self):
+        # Its sibling lists no build, so there is nothing to move it to, the head
+        # least of all.
         head = "a48d212425fe0a9d5822b3dcfe670b61dfa41045"
         p = fixture("go-project", {"github.com/codesweep-ai/ledger": {
-            "status": "behind", "level": "info", "provider": "ledger",
-            "lag": {"commits": 12, "head": head, "pinned": "bbe29a48e449"}}})
-        act = document(p)["go-project:sync:ledger-go-github-com-codesweep-ai-ledger"]
-        self.assertEqual(act["steps"], [{"run": f"go get -tool github.com/codesweep-ai/ledger/cmd/cs-ledger@{head} && go mod tidy",
-                                         "cwd": "."}])
+            "status": "held", "level": "idle", "provider": "ledger",
+            "lag": {"commits": 0, "head": head, "pinned": "bbe29a48e449", "held": "ledger lists no build"}}})
+        acts = document(p)
+        self.assertFalse([c for a in acts.values() for c in a["changes"] if c["name"] == "github.com/codesweep-ai/ledger"])
 
     def test_a_sibling_pin_moves_to_its_last_passing_build_rather_than_its_head(self):
         head, built = "a48d212425fe0a9d5822b3dcfe670b61dfa41045", "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
@@ -92,18 +93,21 @@ class GoProject(unittest.TestCase):
 
 
 class NpmProject(unittest.TestCase):
-    def test_a_sibling_pin_installs_the_build_of_its_head_commit_not_a_tag(self):
+    def test_a_sibling_pin_installs_the_build_of_its_last_built_commit_not_a_tag(self):
         p = fixture("npm-project", {
             "@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
-                "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": "0.3.1-dev.20260922202805.27eb21f"}},
+                "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c",
+                "built": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": "0.3.1-dev.20260922202805.27eb21f"}},
             "@codesweep-ai/ledger": {"status": "behind", "level": "info", "provider": "ledger", "lag": {
-                "commits": 4, "head": "a48d212425fe0a9d5822b3dcfe670b61dfa41045"}},
+                "commits": 4, "head": "a48d212425fe0a9d5822b3dcfe670b61dfa41045",
+                "built": "a48d212425fe0a9d5822b3dcfe670b61dfa41045"}},
         })
         acts = document(p)
         ui = acts["npm-project:sync:ui-npm-codesweep-ai-ui"]
         self.assertEqual(ui["steps"], [{"run": "npm install --save-exact @codesweep-ai/ui@0.3.1-dev.20260922202805.27eb21f", "cwd": "."}])
         self.assertEqual(ui["changes"][0]["to"], "0.3.1-dev.20260922202805.27eb21f")
-        # No build of the head yet: the step says what to wait for rather than naming a tag.
+        # The registry holds no version of that build yet: the step says what to wait
+        # for rather than naming a tag.
         (step,) = acts["npm-project:sync:ledger-npm-codesweep-ai-ledger"]["steps"]
         self.assertIn("a48d212425fe", step["do"])
 
@@ -172,7 +176,8 @@ class Ledger(unittest.TestCase):
     def test_the_ui_pin_edits_the_go_constant_and_rebuilds_and_re_renders_after(self):
         built = "0.3.1-dev.20260922202805.27eb21f"
         p = fixture("ledger", {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
-            "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": built}}})
+            "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c",
+            "built": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": built}}})
         act = document(p)["ledger:sync:ui-npm-codesweep-ai-ui"]
         self.assertEqual(act["steps"][:2], [
             {"run": f"npm install --save-exact @codesweep-ai/ui@{built}", "cwd": "viewer"},
@@ -187,7 +192,8 @@ class Ledger(unittest.TestCase):
 # embeds it, so a move that only installs leaves the committed viewer stale.
 UI_BUILD = "0.3.1-dev.20260922233547.67ef1cf"
 UI_BEHIND = {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
-    "commits": 4, "head": "67ef1cf11c130f524597e0b99beabf739899ab16", "version": UI_BUILD}}}
+    "commits": 4, "head": "67ef1cf11c130f524597e0b99beabf739899ab16",
+    "built": "67ef1cf11c130f524597e0b99beabf739899ab16", "version": UI_BUILD}}}
 
 
 class Tracer(unittest.TestCase):

@@ -24,7 +24,7 @@
   var STATUS_LABEL = {
     vulnerable: "vulnerable", eol: "end of life", "eol-soon": "EOL soon", major: "major behind",
     minor: "minor behind", patch: "patch behind", behind: "commits behind", deprecated: "deprecated",
-    current: "current", floating: "floating", unknown: "unknown", untracked: "not compared"
+    current: "current", floating: "floating", unknown: "unknown", untracked: "not compared", held: "held"
   };
   var STATE_ICON = { critical: "vulnerable", serious: "eol-soon", warning: "major", info: "minor", good: "current", idle: "current" };
 
@@ -75,6 +75,7 @@
     minor: P('<path d="M4 10l4-4 4 4"/>'),
     patch: P('<path d="M4 10l4-4 4 4"/>'),
     behind: P('<circle cx="8" cy="8" r="2.2"/><path d="M1.5 8h4.3m4.4 0h4.3"/>'),
+    held: P('<path d="M6 4.5v7M10 4.5v7"/>'),
     deprecated: P('<circle cx="8" cy="8" r="5.5"/><path d="M4.2 11.8l7.6-7.6"/>'),
     current: P('<path d="M3.5 8.5l3 3 6-6"/>'),
     floating: P('<path d="M2.5 9c1.5-2 2.8-2 4.2 0s2.7 2 4.1 0 2.2-1.6 2.7-1"/>'),
@@ -691,6 +692,8 @@
     var lagText = function (d) {
       var l = d.lag || {};
       if (d.error) return '<span class="dp-muted">' + esc(clip(d.error, 50)) + "</span>";
+      // Its sibling lists no build, so nothing moves the pin: say why rather than count.
+      if (l.held) return '<span class="dp-muted">' + esc(clip(l.held, 50)) + "</span>";
       if (l.builds != null) return l.builds ? plural(l.builds, "newer build") + ", " + fmtSpan(l.days) : "newest build";
       var n = l.commits_touching != null ? l.commits_touching : l.commits;
       if (n) return plural(n, "commit") + (l.commits_touching != null ? " in " + l.paths.join(", ") : "") + (l.days ? ", " + fmtSpan(l.days) : "");
@@ -707,6 +710,7 @@
     };
     var worst = out.reduce(function (l, d) { return rank(d.level) > rank(l) && d.status === "behind" ? d.level : l; }, "good");
     var behindOut = out.filter(function (d) { return d.status === "behind"; }).length;
+    var heldOut = out.filter(function (d) { return d.status === "held"; }).length;
     var behindIn = incoming.filter(function (i) { return i.dep.status === "behind"; }).length;
     // A pin in sync needs nothing, so it is named once rather than given a row.
     var block = function (title, list) {
@@ -728,7 +732,8 @@
     if (embedded) return '<div class="dp-internal-embedded">' + body + (goBehind ? '<div class="dp-how"><span class="text-label-upper">How</span><code>make repin</code></div>' : "") + "</div>";
     return '<article class="ci-card dp-card--' + (behindOut ? worst : "good") + '" data-state="' + (behindOut ? worst : "good") + '">' +
       '<header class="ci-card__head"><h2>' + navLink(projectHref(p.name, "internal"), esc(p.name)) + "</h2>" +
-      chip(behindOut ? worst : "good", behindOut ? "behind" : "current", behindOut ? plural(behindOut, "pin") + " behind" : "in sync") + "</header>" +
+      chip(behindOut ? worst : heldOut ? "idle" : "good", behindOut ? "behind" : heldOut ? "held" : "current",
+        behindOut ? plural(behindOut, "pin") + " behind" : heldOut ? plural(heldOut, "pin") + " held" : "in sync") + "</header>" +
       '<p class="ci-card__desc">Pins ' + plural(uniq(out.map(function (d) { return d.provider; })).length, "sibling") + " · pinned by " +
       plural(uniq(incoming.map(function (i) { return i.project.name; })).length, "project") + (behindIn ? ", " + behindIn + " of those pins behind" : "") + "</p>" +
       body + (goBehind ? '<footer class="ci-card__foot"><span class="text-label-upper">How</span> <code>make repin</code> moves every Go tool pin to its last passing build</footer>' : "") + "</article>";

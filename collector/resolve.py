@@ -57,6 +57,18 @@ def days_between(a, b):
     return (b - a).total_seconds() / 86400
 
 
+def newest_built(status):
+    """The newest build a sibling's status file names, or None.
+
+    `built` lists the builds newest first. A file from before that list named a
+    single one, and a sibling that has not moved its action pin since still
+    writes it that way."""
+    b = status.get("built")
+    if isinstance(b, list):
+        b = b[0] if b else None
+    return b if isinstance(b, dict) and b.get("commit") else None
+
+
 class Resolver:
     def __init__(self, sources, org, repos, now, built=None):
         self.src = sources
@@ -139,7 +151,7 @@ class Resolver:
                 # The version to install is the one built from the commit the pin moves
                 # to. Its status file says which npm version that build published; a
                 # dist-tag names whichever build was tagged last, which can be older.
-                to = lag.get("built") or lag["head"]
+                to = lag["built"]
                 named = ((self.built.get(repo) or {}).get("versions") or {}).get("npm") or {}
                 built = [named[name]] if lag.get("built") and named.get(name) else \
                     [v for v in self.src.npm_versions(name) or []
@@ -537,10 +549,12 @@ class Resolver:
         """How far a pin on another project's commit trails the last commit that project built.
 
         A repin moves a pin to the newest commit the sibling's CI built and passed,
-        which its status file names in `built`. A commit past that one is still
+        which its status file names first in `built`. A commit past that one is still
         building, failed, or changed nothing CI builds, so a pin at the built commit,
         or past it, trails nothing. A sibling that names no built commit, or one this
-        clone does not hold on its branch, is measured against its branch head.
+        clone does not hold on its branch, gives a repin nothing to move to: the pin
+        is held where it is, and `lag.held` says why. Its head is no target, since
+        it may not have built.
         """
         stamp = versions.pseudo(version)
         sha = stamp[1] if stamp else version
@@ -559,11 +573,17 @@ class Resolver:
             dep["error"] = f"commit {sha[:12]} is not in {repo_name}'s history"
             return
         pinned_at = repo.commit_time(sha)
-        target_at = repo.commit_time(built) if built else repo.committed
+        if not built:
+            dep["lag"] = {"commits": 0, "days": 0.0, "head": repo.sha, "pinned": sha[:12],
+                          "held": f"{repo_name} lists no build" if not named
+                          else f"{repo_name}'s last build is not on its branch"}
+            if not repo.on_branch(sha):
+                dep["lag"]["off_branch"] = True
+            dep["upstream"] = {"version_date": iso(pinned_at)}
+            return
+        target_at = repo.commit_time(built)
         # Whole commits: an action pin moves to one, and a pin names a commit in full.
-        lag = {"commits": behind, "days": 0.0, "head": repo.sha, "pinned": sha[:12]}
-        if built:
-            lag["built"] = built
+        lag = {"commits": behind, "days": 0.0, "head": repo.sha, "pinned": sha[:12], "built": built}
         if paths:
             lag["commits_touching"] = repo.behind(sha, paths, upto=upto)
             lag["paths"] = list(paths)
@@ -573,7 +593,7 @@ class Resolver:
             lag["off_branch"] = True
         dep["lag"] = lag
         dep["upstream"] = {"latest_date": iso(target_at), "version_date": iso(pinned_at),
-                           "url": f"{repo.url}/compare/{sha[:12]}...{built[:12] if built else repo.branch or 'HEAD'}"}
+                           "url": f"{repo.url}/compare/{sha[:12]}...{built[:12]}"}
         if behind and pinned_at and target_at:
             dep["libyears"] = round((target_at - pinned_at).total_seconds() / 86400 / 365.25, 2)
 
@@ -965,6 +985,9 @@ class Resolver:
             status, level = "eol", "warning" if dep.get("scope") == "engines" else "serious" if relaxed else "critical"
         elif phase == "eol-soon":
             status, level = "eol-soon", "info" if dep.get("scope") == "engines" else "serious"
+        elif lag.get("held"):
+            # Its sibling lists no build, so a repin has nothing to move it to.
+            status, level = "held", "idle"
         elif lag.get("commits_touching", lag.get("commits")) or lag.get("builds"):
             # An action pinned by commit is behind only if its own directory moved.
             status = "behind"

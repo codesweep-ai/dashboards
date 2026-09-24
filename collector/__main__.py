@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from . import actions, catalog, extract, gitrepo, policy, reach, sbom
 from .http import Client, FetchError
-from .resolve import LEVELS, Resolver, attention, known_facts, level_rank
+from .resolve import LEVELS, Resolver, attention, known_facts, level_rank, newest_built
 from .sources import Sources, iso
 
 SCHEMA = 1
@@ -286,7 +286,7 @@ def main(argv=None):
     if site:
         with ThreadPoolExecutor(max_workers=6) as pool:
             statuses = dict(pool.map(read_status, [n for n in repos if status_paths.get(n)]))
-    built = {n: s["built"] for n, s in statuses.items() if isinstance(s.get("built"), dict)}
+    built = {n: b for n, s in statuses.items() if (b := newest_built(s))}
 
     resolver = Resolver(src, org, repos, now, built)
     projects = []

@@ -11,7 +11,7 @@ REQUIRED = ("schema", "generated", "org", "projects", "lifecycle", "history", "s
 REQUIRED_DEP = ("ecosystem", "name", "version", "scope", "sources", "status", "level")
 ECOSYSTEMS = {"go", "npm", "pypi", "actions", "runtime", "image", "package", "native"}
 STATUSES = {"vulnerable", "eol", "eol-soon", "behind", "major", "deprecated", "minor", "patch",
-            "current", "floating", "unknown", "untracked"}
+            "current", "floating", "unknown", "untracked", "held"}
 LEVELS = {"idle", "good", "info", "warning", "serious", "critical"}
 REACHABLE = {"called", "imported", "required", "not-in-build"}
 VERDICTS = {"allowed", "review", "denied", "unknown", "not-shipped", "aggregate"}

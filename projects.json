@@ -4,6 +4,7 @@
  "comment": "Each project publishes its own ci-status.json to its Pages site. These URLs are relative to this file, so they resolve on whichever host serves the page, and a fork reads its own owner's projects. Being same-origin, they need no CORS, no API rate limit and no token. Adding a project here is the only change the dashboard needs.",
  "projects": [
   { "name": "campaign", "status": "../campaign/ci-status.json" },
+  { "name": "dashboards", "status": "../dashboards/ci-status.json" },
   { "name": "ledger",   "status": "../ledger/ci-status.json" },
   { "name": "lint",     "status": "../lint/ci-status.json" },
   { "name": "npmrevs",  "status": "../npmrevs/ci-status.json" },

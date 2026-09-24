@@ -23,6 +23,14 @@
     {
       "date": "2026-09-23",
       "text": "`built` is now an object: the commit, and the versions it was published under. Those are its Go module version, its image tags and its npm versions, and every run records the same for its own commit. An npm pin needs the version rather than the SHA, and the history shows what each build published."
+    },
+    {
+      "date": "2026-09-23",
+      "text": "`built` is now a list of up to 10 builds, newest first, so a repin waiting for a commit it pushed still finds it after a newer build. It reads `ci`'s own runs, and a project that publishes images needs the `publish images` commit status on the commit (DSH-019). `make repin` keeps a pin whose project lists no build, rather than moving it to the tip."
+    },
+    {
+      "date": "2026-09-23",
+      "text": "The image check reads the registry, not the commit status, and the action's own job makes one GitHub API call: the run history. Its workflows, go.mod and details come from the checkout and the event, and git says whether a build is still on the branch."
     }
   ],
   "links": []

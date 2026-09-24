@@ -137,8 +137,8 @@ class Resolve(unittest.TestCase):
         self.assertEqual(d["behind"], "major")
 
     def test_an_internal_pseudo_version_counts_commits(self):
-        repos = {"ledger": FakeRepo(behind=8)}
-        d = resolver(repos=repos).resolve(dep(name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
+        repos = {"ledger": FakeRepo(behind=8, times={"c0ffee00" * 5: NOW})}
+        d = resolver(repos=repos, built={"ledger": {"commit": "c0ffee00" * 5}}).resolve(dep(name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
                                               version="v0.0.0-20260901000000-bda511aea589", internal=True,
                                               scope="tool", datasource="goproxy"))
         self.assertEqual((d["provider"], d["lag"]["commits"], d["lag"]["pinned"]), ("ledger", 8, "bda511aea589"))
@@ -150,7 +150,7 @@ class Resolve(unittest.TestCase):
                                       "repository": "git+https://github.com/codesweep-ai/ledger.git"},
                           npm_versions=["0.0.0-20260901000000-129b17f78d58", "0.0.0-20260905000000-bda511aea589",
                                         "0.0.0-20260912000000-d687ad5b2775"])
-        d = resolver(src, {"ledger": FakeRepo(behind=8)}).resolve(dep(
+        d = resolver(src, {"ledger": FakeRepo(behind=8)}, {"ledger": {"commit": "d687ad5b2775" + "0" * 28}}).resolve(dep(
             ecosystem="npm", name="@codesweep-ai/ledger", package="@codesweep-ai/ledger", scope="dev",
             version="0.0.0-20260905000000-bda511aea589", internal=True, datasource="npm"))
         self.assertEqual(d["lag"]["version"], "0.0.0-20260912000000-d687ad5b2775")
@@ -159,10 +159,10 @@ class Resolve(unittest.TestCase):
         # A fork keeps the org's module path, so the pin is still internal. Its lag
         # and its compare link come from the clone the run read, which is the fork's.
         repos = {"ledger": FakeRepo(behind=2, url="https://github.com/alice/ledger")}
-        d = resolver(repos=repos).resolve(dep(name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
-                                              version="v0.0.0-20260901000000-bda511aea589", internal=True,
-                                              scope="tool", datasource="goproxy"))
-        self.assertEqual(d["upstream"]["url"], "https://github.com/alice/ledger/compare/bda511aea589...main")
+        d = resolver(repos=repos, built={"ledger": {"commit": "c0ffee00" * 5}}).resolve(dep(
+            name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
+            version="v0.0.0-20260901000000-bda511aea589", internal=True, scope="tool", datasource="goproxy"))
+        self.assertEqual(d["upstream"]["url"], "https://github.com/alice/ledger/compare/bda511aea589...c0ffee00c0ff")
 
     LEDGER_PIN = dict(name="github.com/codesweep-ai/ledger", package="github.com/codesweep-ai/ledger",
                       version="v0.0.0-20260901000000-bda511aea589", internal=True, scope="tool", datasource="goproxy")
@@ -184,13 +184,17 @@ class Resolve(unittest.TestCase):
         self.assertEqual(d["upstream"]["url"], "https://github.com/codesweep-ai/ledger/compare/bda511aea589...c0ffee00c0ff")
         self.assertEqual(resolver().classify(d)["status"], "behind")
 
-    def test_without_a_last_build_a_pin_is_counted_to_the_head(self):
-        for built in (None, {"ledger": {"commit": self.BUILT}}):
-            # No status file names one, or the one it names is off the branch.
+    def test_without_a_last_build_a_pin_is_held(self):
+        # No status file names one, or the one it names is off the branch: the
+        # head may not have built, so nothing moves the pin, and it trails nothing.
+        for built, why in ((None, "ledger lists no build"),
+                           ({"ledger": {"commit": self.BUILT}}, "ledger's last build is not on its branch")):
             repos = {"ledger": FakeRepo(behind={"HEAD": 3, self.BUILT: 0}, off_branch=[self.BUILT])}
             d = resolver(repos=repos, built=built).resolve(dep(**self.LEDGER_PIN))
-            self.assertEqual(d["lag"]["commits"], 3)
+            self.assertEqual((d["lag"]["commits"], d["lag"]["held"]), (0, why))
             self.assertNotIn("built", d["lag"])
+            self.assertNotIn("url", d["upstream"])
+            self.assertEqual((resolver().classify(d)["status"], d["level"]), ("held", "idle"))
 
     def test_an_internal_npm_pin_names_the_version_the_last_build_published(self):
         src = FakeSources(npm_latest={"version": "0.0.0-20260901000000-129b17f78d58",
@@ -213,7 +217,7 @@ class Resolve(unittest.TestCase):
 
     def test_an_internal_action_counts_commits_in_its_directory(self):
         repos = {"dashboards": FakeRepo(behind=8, touching=1)}
-        d = resolver(repos=repos).resolve(dep(ecosystem="actions", name="codesweep-ai/dashboards/action",
+        d = resolver(repos=repos, built={"dashboards": {"commit": "c0ffee00" * 5}}).resolve(dep(ecosystem="actions", name="codesweep-ai/dashboards/action",
                                               version="4c204c69b8b2b79a101c65520b86944de06942a0", subpath="action",
                                               pinned_sha=True, internal=True, datasource="github",
                                               package="codesweep-ai/dashboards", scope="ci"))
@@ -397,6 +401,21 @@ class Snapshot(unittest.TestCase):
         self.assertEqual(names["git-delta"], [], "git-delta is its own source package, not a git subpackage")
         self.assertEqual((project["snapshot"]["updates"], project["snapshot"]["matched"]), (3, 2))
 
+
+
+class NewestBuiltTest(unittest.TestCase):
+    A, B = "a" * 40, "b" * 40
+
+    def test_the_first_of_the_list(self):
+        status = {"built": [{"commit": self.B, "versions": {}}, {"commit": self.A, "versions": {}}]}
+        self.assertEqual(resolve.newest_built(status)["commit"], self.B)
+
+    def test_a_file_that_names_one_build(self):
+        self.assertEqual(resolve.newest_built({"built": {"commit": self.A}})["commit"], self.A)
+
+    def test_none_where_nothing_is_built(self):
+        for status in ({}, {"built": None}, {"built": []}, {"built": [{}]}, {"built": "a"}):
+            self.assertIsNone(resolve.newest_built(status))
 
 if __name__ == "__main__":
     unittest.main()

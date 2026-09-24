@@ -34,6 +34,15 @@ codesweep.ai/dashboards/
 2. Set that repository's **Settings › Pages › Source** to **GitHub Actions**.
 3. Add it to `projects.json` here.
 
+The Pages workflow checks out the branch's history without its file contents: `fetch-depth: 0`
+with `filter: blob:none`. The action then asks git rather than GitHub's API whether a build is
+still on the branch. In the repository's own job it reads its workflows, its go.mod and its details from
+the checkout and the event, which leaves one API call: the run history.
+
+A project that publishes images needs them out before a commit is built. The action reads that
+from the registry: the commit's version has to be in every image repository the project publishes
+to. [SPEC.md](SPEC.md) says why the run alone cannot tell.
+
 The collection logic lives in `action/`, so it is written once rather than copied into each
 project. A project pins it by commit, `codesweep-ai/dashboards/action@<sha>`, rather than by
 branch: `@main` would mean that project's build runs whatever this repository holds today.

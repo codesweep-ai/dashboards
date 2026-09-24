@@ -25,7 +25,7 @@ it up.
 
 ```jsonc
 {
-  "schema": 1,                       // integer, bumped on a breaking change
+  "schema": 2,                       // integer, bumped on a breaking change
   "generated": "2026-09-10T07:00:00Z",  // when this file was written, UTC
   "window": 20,                      // the cap on runs summarised per workflow
   "repo": {
@@ -36,10 +36,12 @@ it up.
     "branch": "main",                // the branch the runs are from
     "pushed_at": "2026-09-09T22:00:00Z"  // copied from the repository, may be null
   },
-  "built": {                         // the newest passing push build of ci, or null
-    "commit": "70fa2864…",           // its full SHA
-    "versions": { /* see below */ }  // what it was published under
-  },
+  "built": [                         // the newest passing push builds of ci, newest first
+    {
+      "commit": "70fa2864…",         // its full SHA
+      "versions": { /* see below */ } // what it was published under
+    }
+  ],
   "workflows": [ /* see below */ ]
 }
 ```
@@ -80,7 +82,7 @@ Each run:
 }
 ```
 
-The versions a commit was published under, in `built` and in every run:
+The versions a commit was published under, in each `built` entry and in every run:
 
 ```jsonc
 {
@@ -130,15 +132,42 @@ for.
 - **At most the 100 most recent runs are read**, in one API page, before the
   window is applied per workflow. A repository that builds often enough to fill
   that page may report fewer than `window` runs for a rarely run workflow.
-- **`built` is the commit a sibling pins.** Its `commit` is the full SHA of the newest run
-  of `ci` that a push started and that passed, among the runs read, provided the
-  branch still holds that commit. A project that declares a `publish images`
-  workflow also needs a run of it that passed for that commit, since something
-  that pins the commit may install its image. A commit that changed nothing CI
-  builds has no run, and a failed or unfinished build is passed over, so `built`
-  may name a commit older than the branch's tip. It is `null` when no run
-  qualifies. A sibling's `make repin` pins its tools to it, reading `commit` from
-  inside `built` with `sed`, so each stays on a line of its own.
+- **One API call, in the repository's own job.** The run history above is the
+  only call to GitHub's API there. The workflows come from the checkout's
+  `.github/workflows`, each named by its top-level `name:` or its path, so one
+  switched off by hand is still listed. The module path comes from the
+  checkout's `go.mod`, and the repository's details from the event that started
+  the run. Whether a build is still on the branch is asked of git, which needs a
+  checkout with the branch's history: `fetch-depth: 0` with `filter: blob:none`
+  brings it without the file contents. Run anywhere else, the action asks the
+  API for each of these instead.
+- **`built` lists the commits a sibling may pin, newest first.** Each is a
+  commit that a push to the branch started a run of `ci` for, and that run
+  passed. The branch still holds it, and it is named once, however many times it
+  was built. The list holds at most 10, found among the newest 30 such runs. It is
+  empty when no run qualifies. A commit that changed nothing CI builds has no
+  run, and a failed or unfinished build is passed over, so the first entry may
+  be older than the branch's tip. `ci`'s runs are read from the page above. They
+  are asked for on their own only when that page holds none that passed, as
+  after a long stretch of pushes that change only the ledger.
+- **A project that publishes images needs them before a commit is built.** When
+  it declares a `publish images` workflow, the commit's version also has to be in
+  every image repository the project publishes to. That is read from the
+  registry's tag lists, with no call to GitHub. The workflow pushes that version tag last: an npm
+  package's wrapper after its platform packages, and a sandbox image's list once
+  both architectures are in. A version pruned since drops its commit out of the
+  list. The run itself cannot say which commit it published: GitHub lists a run
+  started by `ci` finishing under whatever commit is the branch's head by then.
+  The `publish images` commit status the workflow posts on the commit is for a
+  reader of GitHub, and the file does not read it.
+- **A lookup that fails does not shorten the list.** Where GitHub's API fails for
+  any reason but the commit's being unknown, the file is not written, rather than
+  written without a build it should name. A registry that does not answer lists
+  no image repository, and so names no build.
+- **A sibling pins the first entry.** Its `make repin` reads the first `commit`
+  inside `built` with `sed`, so each stays on a line of its own. A sibling that
+  pushed a commit and pins it once built waits for the commit to appear
+  anywhere in the list, so a newer build does not hide it.
 - **`versions` says what a commit was published under**, which is what a pin on
   it names. `go` is the version Go's module proxy gives the commit of the module
   the repository's `go.mod` declares. It is what `go get` records and what a
@@ -424,10 +453,11 @@ Each record in `dependencies` has this shape:
                  "eol": "2026-04-22", "lts": false, "latest": "6.19.14", "phase": "eol", "url": "…" },
   "lag": { "commits": 8, "commits_touching": 1, "paths": ["action"], "days": 0.5,
            "head": "d687ad5b27750000…",   // the whole commit the sibling's default branch is at
-           "built": "a48d212425fe0000…",  // the sibling's last passing build, when its status file names one
+           "built": "a48d212425fe0000…",  // the sibling's last passing build: the first its status file names
            "pinned": "4c204c69b8b2",
            "version": "0.3.1-dev.20260922202805.27eb21f",   // npm: the registry's build of that commit
            "builds": 3,                   // an image: newer tier builds, in place of commits
+           "held": "ledger lists no build",   // why nothing moves the pin, when its status is `held`
            "off_branch": true },          // the pinned commit is not on the default branch
   "provider": "dashboards",          // internal: the project pinned
   "runner": { "image": "macOS 26 Arm64", "os": "macos", "version": "26", "arch": "arm64",
@@ -518,6 +548,7 @@ row that applies wins:
 | `vulnerable` | an advisory affects the pinned version | `critical` for a high or critical advisory in something that ships, or for any advisory exploited in the wild; `serious` otherwise |
 | `eol` | its release cycle is past its end of life | `critical`, `serious` for a dev, CI or optional scope, or `warning` for an `engines` floor |
 | `eol-soon` | its release cycle ends within 90 days | `serious`, or `info` for an `engines` floor |
+| `held` | an internal pin whose project lists no build, so a repin has nothing to move it to | `idle` |
 | `behind` | an internal pin trails the last passing build of the project it pins | `info` up to 14 days of work, `warning` to 60, `serious` past that |
 | `major` | a newer major version exists | `warning`, or `serious` once that release is a year old |
 | `deprecated` | its publisher deprecated the pinned version | `warning` |
@@ -643,11 +674,12 @@ one of Dependabot's dismissal reasons: `fix_started`, `inaccurate`, `no_bandwidt
 - **A libyear is the time from the pinned release to the newest one**, in years. It is counted only for
   a record that is behind with both release dates known. For an internal pin it runs from the pinned
   commit to the commit it trails.
-- **An internal pin trails the sibling's last passing build.** That is the commit the sibling's status
-  file names in `built`, and the one a repin moves a pin to. `lag.commits`, `lag.days` and the compare
+- **An internal pin trails the sibling's last passing build.** That is the first commit the sibling's
+  status file names in `built`, and the one a repin moves a pin to. `lag.commits`, `lag.days` and the compare
   link run from the pin to it. A pin at that build, or past it, is `current` though the head has moved on.
   Where the status file names no build, or names one the clone does not hold on the branch, the pin is
-  measured against the head.
+  `held`. A repin has nothing to move it to, since the head may not have built. `lag.held` says why, the
+  record links no compare, and no action moves it.
 - **Versions compare as numbers.** A pin with fewer components floats inside what it names, so `v7`
   trails `v8` but not `v7.3`. A 0.x minor bump counts as a minor one.
 - **A newer cycle of Node.js, Java or Ubuntu counts once it is long-term support.** Until then the newest
@@ -834,7 +866,7 @@ https://codesweep.ai/dashboards/deps-actions.json
   command imports. The module path would add a second tool line. Only `go.mod` is tidied: a module file
   beside it holds a tool's requirements, and tidy would add the directory's packages to it.
 - **A sibling pin moves to one commit, and no other pin moves with it.** That commit is `lag.built`,
-  or `lag.head` where there is none. A Go `sync` runs `go get <module>@<commit>` in each module file that pins it, with the tool's command as above. An
+  and a `held` pin, which has none, gets no step. A Go `sync` runs `go get <module>@<commit>` in each module file that pins it, with the tool's command as above. An
   npm `sync` installs `lag.version`, the build the registry holds of that commit. A dist-tag names
   whichever build was tagged last, which can be older than the pin. Until the registry holds the build,
   the step says so instead.
