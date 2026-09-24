@@ -147,6 +147,7 @@ class BuildTest(unittest.TestCase):
 
     def test_a_failed_lookup_stops_the_file_rather_than_dropping_a_build(self):
         err = ci_status.urllib.error.HTTPError("x", 502, "Bad Gateway", {}, io.BytesIO())
+        self.addCleanup(err.close)
         api, fetch, _ = self.fake(self.both(), compare=err)
         with self.assertRaises(ci_status.urllib.error.HTTPError):
             self.build(api, fetch)

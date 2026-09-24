@@ -126,6 +126,9 @@ def quietly(read, default):
     which the dashboard needs whether or not a registry answers."""
     try:
         return read()
+    except urllib.error.HTTPError as exc:
+        exc.close()   # it holds the response, and a refusal is all it says
+        return default
     except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError):
         return default
 
@@ -146,8 +149,12 @@ def module_path(owner, name, ref, token):
                 return f[1].strip('"')
         return None
     local = os.path.join(os.environ.get("GITHUB_WORKSPACE", "."), "go.mod")
+
+    def read_local():
+        with open(local, encoding="utf-8") as fh:
+            return parse(fh.read())
     if own_run(owner, name):
-        return quietly(lambda: parse(open(local).read()), None) if os.path.isfile(local) else None
+        return quietly(read_local, None) if os.path.isfile(local) else None
 
     def read():
         doc = api(f"repos/{owner}/{name}/contents/go.mod?ref={ref}", token)
@@ -304,6 +311,7 @@ def build(owner, name, token, window):
             cmp = api(f"repos/{owner}/{name}/compare/{sha}...{branch}", token)
         except urllib.error.HTTPError as exc:
             if exc.code in (404, 422):
+                exc.close()   # it holds the response, and a refusal is all it says
                 return False
             raise
         return cmp.get("status") in ("ahead", "identical")
@@ -442,6 +450,7 @@ def main():
         data = build(owner, name, token, window)
     except urllib.error.HTTPError as exc:
         limited = " (rate limited)" if exc.headers.get("X-RateLimit-Remaining") == "0" else ""
+        exc.close()
         sys.exit(f"ci-status: {slug}: HTTP {exc.code} {exc.reason}{limited}")
     except (urllib.error.URLError, OSError) as exc:
         sys.exit(f"ci-status: {slug}: {exc}")
