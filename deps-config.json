@@ -43,17 +43,6 @@
    "package": "pyenv/pyenv"
   },
   {
-   "project": "ledger",
-   "path": "internal/ledger/render.go",
-   "match": "const UIVersion = \"([^\"]+)\"",
-   "ecosystem": "npm",
-   "scope": "direct",
-   "internal": true,
-   "name": "@codesweep-ai/ui",
-   "datasource": "npm",
-   "package": "@codesweep-ai/ui"
-  },
-  {
    "project": "campaign",
    "path": "dispatch-viewer/fixtures/vendor/axe-core/axe.min.js",
    "match": "axe\\.version=\"([^\"]+)\"",
@@ -91,10 +80,7 @@
    "project": "ledger",
    "name": "@codesweep-ai/ui",
    "steps": [
-    {"edit": "internal/ledger/render.go", "text": "raise RendererVersion, as CONTRIBUTING.md asks when the rendered page changes"},
-    {"run": "make viewer-build build", "cwd": "."},
-    {"run": "bin/cs-ledger render ledger && bin/cs-ledger render fixtures/sandbox/ledger", "cwd": "."},
-    {"edit": "MANUAL.md", "text": "set the renderer and @codesweep-ai/ui versions in the sample `cs-ledger version` line"}
+    {"run": "make viewer-repin", "cwd": "."}
    ]
   },
   {

@@ -929,8 +929,7 @@ https://codesweep.ai/dashboards/deps-actions.json
   "after": [ {
     "project": "ledger",
     "name": "@codesweep-ai/ui",
-    "steps": [ { "edit": "internal/ledger/render.go", "text": "raise RendererVersion, …" },
-               { "run": "make viewer-build build", "cwd": "." } ]
+    "steps": [ { "run": "make viewer-repin", "cwd": "." } ]
   } ]
 }
 ```

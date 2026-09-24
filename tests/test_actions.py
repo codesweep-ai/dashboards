@@ -173,19 +173,18 @@ class NpmProject(unittest.TestCase):
 
 
 class Ledger(unittest.TestCase):
-    def test_the_ui_pin_edits_the_go_constant_and_rebuilds_and_re_renders_after(self):
+    def test_the_ui_pin_installs_and_viewer_repin_carries_it_through(self):
+        # The viewer is part of every page ledger renders, so its renderer version,
+        # UIVersion and both pages move with it: `make viewer-repin` does all four.
         built = "0.3.1-dev.20260922202805.27eb21f"
         p = fixture("ledger", {"@codesweep-ai/ui": {"status": "behind", "level": "info", "provider": "ui", "lag": {
             "commits": 30, "head": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c",
             "built": "27eb21f6ee839c56e0f157dc7d1c6bf955004f3c", "version": built}}})
         act = document(p)["ledger:sync:ui-npm-codesweep-ai-ui"]
-        self.assertEqual(act["steps"][:2], [
+        self.assertEqual(act["steps"], [
             {"run": f"../scripts/with-npmrevs.sh npm install --save-exact @codesweep-ai/ui@{built}", "cwd": "viewer"},
-            {"edit": "internal/ledger/render.go", "line": 6, "text": f"set the version to {built}",
-             "from": "0.3.1-dev.20260909170256.1638d27", "to": built},
+            {"run": "make viewer-repin", "cwd": "."},
         ])
-        self.assertEqual(act["steps"][2:], next(a["steps"] for a in CONFIG["after"] if a["project"] == "ledger"))
-        self.assertNotIn("internal/ledger", [s.get("cwd") for s in act["steps"]])
 
 
 # tracer and campaign commit the viewer their ui build produces, and the binary
