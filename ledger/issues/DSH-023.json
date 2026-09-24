@@ -3,17 +3,19 @@
   "title": "An internal npm pin's step waits for npmjs.com, though the build's image carries the version",
   "type": "defect",
   "severity": "low",
-  "status": "open",
+  "status": "closed",
   "foundBy": "user report (host): \"We shouldn't be gated by the time it takes for a package to be available on npmjs.com as we have a way to get the packages from the images we publish on ghcr.io, right?\"",
   "opened": "2026-09-24",
-  "resolved": null,
+  "resolved": "2026-09-24",
   "stint": "npm-repins",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "c17f7a3"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "The collector's tests pass, and the seven new or changed ones fail on the code before c17f7a3. Among them are test_where_npm_lists_no_version_yet_the_builds_image_names_it and test_a_project_with_npmrevs_installs_it_from_the_image. ci run 36059417029 passed at c17f7a3. The published deps.json names `scripts/with-npmrevs.sh` as the installer of every internal npm pin. The steps for the behind ui pins in ledger and tracer install through it. No pin was image-only when that file was written, so the tests alone cover that case."
   },
-  "resolution": null,
+  "resolution": "The version a behind internal npm pin moves to comes from the status file, then npmjs.com, then the build's `npm/<name>` image, which `lag.image_only` marks. A project that carries `scripts/with-npmrevs.sh` installs through it, so an image-only version installs at once. A project without it still waits for npmjs.com.",
   "details": "The collector names the version a behind internal npm pin moves to from the status file's `npm` field, and then from npmjs.com. The pages run that npm's own run starts reads npmjs.com before the version it just published is listed there. So the status file names the build with no npm version, and every npm publish on 2026-09-23 did this. Until pages runs again, the pin's step only says to wait for the registry. The build's `npm/<name>` image already carries the same version, and `scripts/with-npmrevs.sh` installs from it. The step also runs a plain `npm install`, which cannot reach a version that only an image holds.",
   "notes": [],
   "links": [
