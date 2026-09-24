@@ -1,0 +1,22 @@
+{
+  "id": "DSH-023",
+  "title": "An internal npm pin's step waits for npmjs.com, though the build's image carries the version",
+  "type": "defect",
+  "severity": "low",
+  "status": "open",
+  "foundBy": "user report (host): \"We shouldn't be gated by the time it takes for a package to be available on npmjs.com as we have a way to get the packages from the images we publish on ghcr.io, right?\"",
+  "opened": "2026-09-24",
+  "resolved": null,
+  "stint": "npm-repins",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "The collector names the version a behind internal npm pin moves to from the status file's `npm` field, and then from npmjs.com. The pages run that npm's own run starts reads npmjs.com before the version it just published is listed there. So the status file names the build with no npm version, and every npm publish on 2026-09-23 did this. Until pages runs again, the pin's step only says to wait for the registry. The build's `npm/<name>` image already carries the same version, and `scripts/with-npmrevs.sh` installs from it. The step also runs a plain `npm install`, which cannot reach a version that only an image holds.",
+  "notes": [],
+  "links": [
+    "DSH-017"
+  ]
+}
