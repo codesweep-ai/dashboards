@@ -1,0 +1,20 @@
+{
+  "id": "DSH-029",
+  "title": "The build store cannot travel between campaign members",
+  "type": "improvement",
+  "severity": "low",
+  "status": "open",
+  "foundBy": "session agent, reviewing how local builds reach campaign members (tasks/pin-on-local-builds.md, section 8)",
+  "opened": "2026-09-25",
+  "resolved": null,
+  "stint": "local-builds",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "A campaign member's store is found by owner, and inside a member the fallback owner is the host user's name, since every checkout sits in the home directory. So a member cannot be pointed at the store a campaign hands it. The store is also a plain directory: `make ci` leaves new builds as loose files, and nothing takes in the builds the orchestrator delivers to a member's clone.",
+  "notes": [],
+  "links": []
+}

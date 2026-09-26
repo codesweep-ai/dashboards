@@ -1,0 +1,20 @@
+{
+  "id": "DSH-028",
+  "title": "The build store records no images, so nothing can wait for them",
+  "type": "improvement",
+  "severity": "low",
+  "status": "open",
+  "foundBy": "session agent, reviewing how local builds reach images (tasks/pin-on-local-builds.md, section 7)",
+  "opened": "2026-09-25",
+  "resolved": null,
+  "stint": "local-builds",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "The status file lists a commit of a project that publishes images only once its images are published. The build store has no such rule, and no place to put images at all. A local build of sandbox is listed as soon as `make ci` passes, before any image of it exists. A sibling that pins it then names an image no host has built.",
+  "notes": [],
+  "links": []
+}
