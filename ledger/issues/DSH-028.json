@@ -3,17 +3,19 @@
   "title": "The build store records no images, so nothing can wait for them",
   "type": "improvement",
   "severity": "low",
-  "status": "open",
+  "status": "closed",
   "foundBy": "session agent, reviewing how local builds reach images (tasks/pin-on-local-builds.md, section 7)",
   "opened": "2026-09-25",
-  "resolved": null,
+  "resolved": "2026-09-25",
   "stint": "local-builds",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "d85e920"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "tests/test_repin_go.py's image test passes: a local build whose entry awaits two images is left out and named until a file for each exists, then taken. For real, sandbox's `make ci` at its pushed head recorded the build awaiting sandbox and sandbox-slim, and `cs-sandbox build` and `cs-sandbox build --slim` then wrote both files under images/sandbox/. GitHub CI's `ci` passed on 7f94c70."
   },
-  "resolution": null,
+  "resolution": "A project that publishes images names them in `CS_BUILD_IMAGES` when it records, and its entry lists them under `awaits`. An image build of the commit writes a file for each under images/. The repin takes the build only once all of them are there, and names a newer one still waiting.",
   "details": "The status file lists a commit of a project that publishes images only once its images are published. The build store has no such rule, and no place to put images at all. A local build of sandbox is listed as soon as `make ci` passes, before any image of it exists. A sibling that pins it then names an image no host has built.",
   "notes": [],
   "links": []
