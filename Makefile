@@ -189,23 +189,21 @@ oss:
 ledger:
 	go tool cs-ledger check ledger
 
-## repin: move each pinned tool to its last build or its latest release
+## repin: move each codesweep-ai tool to its project's newest build, and the others to their latest release
 ##
-## A codesweep-ai tool moves to the newest commit its project lists as `built`
-## in the ci-status.json it publishes (SPEC.md). One whose file cannot be read or
-## lists no build keeps its pin, and says so. The others move to their newest
-## release.
+## The newest build is the newer, by UTC commit time, of two: the last commit the
+## project's CI built and passed, the first in `built` in the ci-status.json it
+## publishes (codesweep-ai/dashboards SPEC.md), and the newest local build the
+## owner's build store holds for it, which a clean `make ci` records there. A pin
+## never lands on a commit nothing built, and one whose project lists neither
+## keeps its pin, and says so. Each pin taken from a local build is named, with
+## its commit and when it was recorded. LOCAL=0 takes CI builds only, for a bump
+## meant to be pushed straight away. scripts/repin-go.sh does the moving, and
+## says how it resolves each pin.
+##
+## The third-party tools move to their newest release.
 repin:
-	@pins=""; \
-	for t in $$(go list tool | grep codesweep-ai); do \
-		owner=$$(echo "$$t" | cut -d/ -f2); repo=$$(echo "$$t" | cut -d/ -f3); \
-		built=$$(curl -fsSL "https://$$owner.github.io/$$repo/ci-status.json" 2>/dev/null | \
-			sed -n '/^ "built": \[$$/,/^ \]/s/^ *"commit": *"\([0-9a-f]\{40\}\)".*/\1/p' | head -1); \
-		if [ -n "$$built" ]; then echo "$$repo: $$(echo "$$built" | cut -c1-7), the last commit its CI built"; \
-			pins="$$pins $$t@$$built"; \
-		else echo "$$repo: held, as its status file lists no build"; fi; \
-	done; \
-	if [ -n "$$pins" ]; then go get -tool $$pins; fi
+	@LOCAL='$(LOCAL)' scripts/repin-go.sh
 	go get -tool github.com/rhysd/actionlint/cmd/actionlint@latest
 	go get -tool golang.org/x/vuln/cmd/govulncheck@latest
 	go mod tidy
@@ -221,7 +219,12 @@ check: owner data test prose refs oss
 ## check is the faster subset to keep beside you while you work. The two gates
 ## it does not carry are the ones with something to install: actionlint, and the
 ## ledger check. The sibling projects draw the line in the same place.
-ci: check actionlint ledger
+ci:
+	@scripts/record-build.sh start
+	@$(MAKE) --no-print-directory check
+	@$(MAKE) --no-print-directory actionlint
+	@$(MAKE) --no-print-directory ledger
+	@scripts/record-build.sh finish
 	@printf '\nci: every gate ran. Not reproduced here: looking at the pages.\n'
 
 ## clean: remove the local preview tree, the copied tokens and the collector's local files

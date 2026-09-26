@@ -35,6 +35,12 @@ That is the faster subset. `make ci` adds the two gates with something to
 install, `actionlint` and the ledger check, and is what has to pass. Neither gate looks at a page, so preview
 the result as well.
 
+A run that passes on a clean tree also records its commit as a local build, so a
+sibling project can pin it before it is pushed. `scripts/record-build.sh` files
+it, with its module zip, in the build store of the repository's owner,
+`~/.local/share/cs-builds/<owner>/`, and says so. A run over uncommitted changes
+records nothing. SPEC.md describes the store.
+
 ## Previewing
 
 `_preview/` mirrors the `codesweep.ai` layout, so relative paths and same-origin

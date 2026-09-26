@@ -68,6 +68,10 @@ oss:
   # moving the linter pin.
   expectedTargets: ["build", "status", "dependencies", "preview", "repin"]
 
+  # github.com because git@github.com is the user of every GitHub SSH URL, and
+  # the tests of scripts/record-build.sh write those on purpose.
+  emailAllow: ["github.com"]
+
   # Every waiver takes the reason it is waived, and that reason is printed with
   # the finding. A waiver nobody can review is a rule deleted in private.
   allow:

@@ -186,6 +186,102 @@ for.
   Its workflow's finished runs are still reported: whatever publishes the status
   can fail, and that failure is worth seeing.
 
+## The local build store
+
+The status file lists the builds GitHub CI made. The store lists the builds this
+machine made, which a sibling may pin while the work is still local. A clean,
+passing `make ci` records its commit there, and so does ui's `npm run ci`.
+`scripts/record-build.sh` writes it, and every project carries the same file.
+
+```
+${CS_BUILDS_DIR:-${XDG_DATA_HOME:-~/.local/share}/cs-builds}/<owner>/
+  status/<name>/<commit>.json                    one file per local build
+  goproxy/<module>/@v/<version>.{info,mod,zip}   the module, in Go's proxy layout
+  npm/<package>-<version>.tgz                    the npm packages, flat
+  images/<name>/<commit>/<image>.json            one file per image made of a local build
+```
+
+Each entry has this shape:
+
+```jsonc
+{
+  "schema": 1,                          // integer, bumped on a breaking change
+  "name": "lint",                       // what a sibling pins it by
+  "commit": "0d7c7727…",                // its full SHA
+  "committed": "2026-09-25T06:07:13Z",  // its commit time, UTC
+  "recorded": "2026-09-25T20:32:02Z",   // when the gate passed, UTC
+  "gate": "make ci",                    // the command that passed
+  "local": true,
+  "awaits": ["sandbox", "sandbox-slim"], // only a project that publishes images
+  "versions": {                         // as in the status file
+    "go": "v0.0.0-20260925060713-0d7c772789e8",
+    "images": {},
+    "npm": { "@codesweep-ai/lint": "0.0.0-20260925060713-0d7c772789e8" }
+  }
+}
+```
+
+An image file has this shape, and `cs-sandbox build` writes it:
+
+```jsonc
+{
+  "schema": 1,
+  "name": "sandbox",                    // the project, as its entry names it
+  "commit": "b630cd4a…",                // the commit its entry records
+  "image": "sandbox-slim",              // one of the images the entry awaits
+  "ref": "localhost/codesweep-ai/sandbox-slim:v0.0.0-20260925233612-b630cd4a1b2c"
+}
+```
+
+### Rules
+
+- **Only a clean tree is recorded.** The tree has to be clean at the same commit
+  when the gate starts and when it finishes. Otherwise the gate says it recorded
+  nothing, and why.
+- **The owner is the one origin names.** It is the GitHub owner in origin's URL,
+  SSH host aliases included. Where origin is no GitHub URL, it is the name of the
+  directory the repository sits in. `CS_BUILD_STORE` names the store directory
+  outright instead, owner and all, which is how a campaign member finds the
+  clone it was handed.
+- **A store that is a repository keeps each build as a commit.** That is the
+  store a campaign hands its members, which the orchestrator carries between
+  them as it carries their project repositories. Each build is committed once
+  its files are written. Before the store is read or written, what the
+  orchestrator pushed to `refs/campaign/orchestrator` is taken into its branch.
+  That is a fast forward where the member recorded nothing since, and a merge
+  otherwise. Every file is named by what it holds, so the merge never conflicts.
+- **The name is the one a sibling pins it by.** It is the last element of the Go
+  module path, or the npm package's name for a project with no `go.mod`.
+- **Nothing is ever rewritten.** Every file is named by what it holds, and a file
+  already there stays: a second build of the same commit writes the same bytes.
+  The entry is written last, so every file it names is already there. A commit
+  already recorded is not built again.
+- **`versions` means what it means in the status file.** `go` is the module's
+  pseudo-version, and `npm` holds the version of the package named after the
+  project. `images` stays empty, since an entry is never rewritten. An image made of the
+  build later gets a file of its own under `images/`.
+- **The module comes from Go itself.** It is what `go mod download` writes for
+  the commit, resolved out of the checkout. So its pseudo-version and its hashes
+  are the ones proxy.golang.org and sum.golang.org give once it is pushed.
+- **The npm packages come from the project's own pack step.** That is
+  `npm/local-registry.sh pack`, or `scripts/npmrevs-registry.mjs pack` in ui. It
+  builds what the publish workflow builds, and a clean commit packs to the same
+  bytes.
+- **A build that awaits images counts once they are there.** A project that
+  publishes images names them in `CS_BUILD_IMAGES` when it records, and its
+  entry lists them under `awaits`. Building one of them from the commit writes
+  its file under `images/`. A repin takes the build only once every image it
+  awaits has a file, just as the status file waits for a project's images. It
+  names a newer build still waiting. An image file names a local tag rather
+  than bytes, so two builds of one image write the same file.
+- **A repin takes the newer of two builds.** For each sibling, `make repin` and
+  `npm run repin` compare its last CI build with its newest local one. The UTC
+  commit time their versions carry decides, and a tie goes to the CI build.
+  `LOCAL=0` leaves the store out.
+- **A local pin resolves through the store.** Go reads `goproxy/` ahead of its
+  usual proxy, and `GONOSUMDB` names only the modules served from there. npm
+  installs through `scripts/with-npmrevs.sh`, which serves `npm/`.
+
 ## The index
 
 `projects.json` in this repository says where the status files are:
