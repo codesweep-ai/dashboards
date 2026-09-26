@@ -495,13 +495,23 @@
     return '<dl class="dp-kv">' + rows.join("") + "</dl>";
   }
 
+  // The inventory's License column: the expression as stated, and what the
+  // policy made of it. The org's own carry no verdict, and read as ours.
+  function licenseCell(d) {
+    var lic = d.license;
+    if (!lic) return '<span class="dp-muted">—</span>';
+    return (lic.expression ? '<code title="' + esc(lic.expression) + '">' + esc(clip(lic.expression, 24)) + "</code>" : '<span class="dp-muted">none found</span>') +
+      '<span class="dp-sub">' + esc(d.internal ? "ours" : String(lic.verdict || "").replace("-", " ")) + "</span>";
+  }
+
   function depRows(p, deps, withProject) {
     return deps.map(function (d) {
       var up = d.upstream || {}, t = target(d), id = depId(d) + (withProject ? "-" + slug(p.name) : "");
       var ver = "<code>" + esc(shortVersion(d)) + "</code>" + (up.effective ? '<span class="dp-sub">' + esc(clip(up.effective, 24)) + "</span>" : "");
       var vcount = (d.vulnerabilities || []).length;
       return '<tr class="dp-dep" id="' + esc(id) + '" tabindex="0" aria-expanded="false" data-eco="' + esc(d.ecosystem) + '" data-level="' + esc(d.level) +
-        '" data-text="' + esc([p.name, d.name, d.label, d.version, d.constraint, up.latest, up.effective, d.status, d.scope, srcPath(d)].join(" ").toLowerCase()) + '">' +
+        '" data-text="' + esc([p.name, d.name, d.label, d.version, d.constraint, up.latest, up.effective, d.status, d.scope, srcPath(d),
+          (d.license || {}).expression].join(" ").toLowerCase()) + '">' +
         '<td class="dp-dep__name">' + ICON.chevron + "<span><b>" + esc(clip(name(d), 60)) + '</b><span class="dp-sub">' + esc(ECO_SHORT[d.ecosystem]) + " · " + esc(d.scope) +
         (d.dev ? " · dev" : "") + "</span></span></td>" +
         (withProject ? "<td>" + navLink(projectHref(p.name), esc(p.name)) + "</td>" : "") +
@@ -513,8 +523,9 @@
           (d.license || {}).verdict === "denied" || (d.license || {}).verdict === "review" ? "license " + d.license.verdict : "",
           (d.license || {}).found ? "license found in files" : "",
           d.sla && d.sla.state !== "within" ? slaText(d.sla) : "", acceptedNow(d) ? "accepted" : ""].filter(Boolean).join(" · ")) + "</span></td>" +
+        (withProject ? "<td>" + licenseCell(d) + "</td>" : "") +
         "<td>" + sourceLink(p, d) + "</td></tr>" +
-        '<tr class="dp-dep__detail" hidden><td colspan="' + (withProject ? 6 : 5) + '">' + "" + "</td></tr>";
+        '<tr class="dp-dep__detail" hidden><td colspan="' + (withProject ? 7 : 5) + '">' + "" + "</td></tr>";
     }).join("");
   }
   function depTable(p, deps, withProject) {
@@ -855,13 +866,13 @@
     var indirectTotal = 0;
     live.forEach(function (p) { indirectTotal += p.summary.indirect; });
     return '<div class="ci-toolbar" id="filters">' +
-      '<div class="dp-search" data-component="SearchInput"><input id="search" data-search-input type="search" placeholder="Filter by name, version or project" aria-label="Filter the inventory" value="' +
+      '<div class="dp-search" data-component="SearchInput"><input id="search" data-search-input type="search" placeholder="Filter by name, version, license or project" aria-label="Filter the inventory" value="' +
       esc(state.q) + '"><span class="dp-search__count" id="search-count" role="status" data-search-status></span></div>' +
       '<button class="ci-btn" id="only-bad" aria-pressed="' + state.bad + '">Needs attention only</button>' +
       '<button class="ci-btn" id="with-indirect" aria-pressed="' + state.indirect + '">Include ' + indirectTotal.toLocaleString() + " indirect</button>" +
       ecoChips() + "</div>" +
       '<div class="ci-table__wrap"><table class="ci-table dp-deps dp-deps--wide" id="inventory"><thead><tr>' +
-      ["Dependency", "Project", "Pinned", "Newest", "Status", "Where"].map(function (h) { return '<th class="text-label-upper">' + h + "</th>"; }).join("") +
+      ["Dependency", "Project", "Pinned", "Newest", "Status", "License", "Where"].map(function (h) { return '<th class="text-label-upper">' + h + "</th>"; }).join("") +
       '</tr></thead><tbody id="inventory-rows"></tbody></table></div><div class="dp-more" id="inventory-more"></div>';
   }
 
@@ -879,7 +890,8 @@
     if (q) {
       rows = rows.filter(function (r) {
         var d = r.d, up = d.upstream || {};
-        return [r.p.name, d.name, d.label, d.version, d.constraint, up.latest, up.effective, d.status, d.scope, srcPath(d)].join(" ").toLowerCase().indexOf(q) >= 0;
+        return [r.p.name, d.name, d.label, d.version, d.constraint, up.latest, up.effective, d.status, d.scope, srcPath(d),
+          (d.license || {}).expression].join(" ").toLowerCase().indexOf(q) >= 0;
       });
     }
     rows.sort(function (a, b) { return rank(b.d.level) - rank(a.d.level) || (isIndirect(a.d) - isIndirect(b.d)) || a.p.name.localeCompare(b.p.name) || name(a.d).localeCompare(name(b.d)); });

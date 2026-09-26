@@ -960,9 +960,9 @@ code { font-family: var(--font-family-mono); font-size: var(--font-size-code); }
 .dp-deps th:nth-child(1) { width: 34%; }
 .dp-deps th:nth-child(2), .dp-deps th:nth-child(3) { width: 17%; }
 .dp-deps th:nth-child(4) { width: 14%; }
+.dp-deps--wide th:nth-child(1) { width: 26%; }
 .dp-deps--wide th:nth-child(2) { width: 10%; }
-.dp-deps--wide th:nth-child(3), .dp-deps--wide th:nth-child(4) { width: 15%; }
-.dp-deps--wide th:nth-child(5) { width: 14%; }
+.dp-deps--wide th:nth-child(3), .dp-deps--wide th:nth-child(4), .dp-deps--wide th:nth-child(5), .dp-deps--wide th:nth-child(6) { width: 13%; }
 .dp-deps td { font-size: var(--font-size-caption); overflow: hidden; text-overflow: ellipsis; vertical-align: top; white-space: normal; }
 .dp-dep { cursor: pointer; }
 .dp-dep:focus-visible { outline-offset: -0.125rem; }
