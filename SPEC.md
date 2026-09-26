@@ -277,7 +277,10 @@ An image file has this shape, and `cs-sandbox build` writes it:
 - **A repin takes the newer of two builds.** For each sibling, `make repin` and
   `npm run repin` compare its last CI build with its newest local one. The UTC
   commit time their versions carry decides, and a tie goes to the CI build.
-  `LOCAL=0` leaves the store out.
+  `LOCAL=0` leaves the store out. Where the sibling's own checkout sits beside
+  the consumer, a local build of a commit it holds on no branch is left out, as
+  after a rebase. A newer build left out that way is named. Without such a
+  checkout, as in a campaign member, the store is taken as it stands.
 - **A local pin resolves through the store.** Go reads `goproxy/` ahead of its
   usual proxy, and `GONOSUMDB` names only the modules served from there. npm
   installs through `scripts/with-npmrevs.sh`, which serves `npm/`.

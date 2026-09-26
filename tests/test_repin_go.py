@@ -188,6 +188,29 @@ class RepinGo(unittest.TestCase):
         self.assertNotIn("waits", out)
         self.assertEqual(self.pinned(repo), new)
 
+    def test_a_local_build_of_a_commit_its_checkout_lost_is_left_out(self):
+        # The tool's own checkout beside the consumer, as in a workspace, after a
+        # rebase took the newer commit off every branch.
+        public, store = self.stores()
+        old = self.record(self.old, public)
+        new = self.record(self.new, store)
+        repo = self.consumer(public, old)
+        sibling = os.path.join(os.path.dirname(repo), "demotool")
+        git(os.path.dirname(repo), "clone", "-q", self.tool, sibling)
+        git(sibling, "checkout", "-q", "-B", "main", self.old)
+        site = self.site(self.old, old)
+        out = self.repin(repo, public, store, site)
+        self.assertIn(f"demotool: {self.old[:7]}, the last commit its CI built", out)
+        self.assertIn(f"demotool: {self.new[:7]}, a newer local build, is left out: ../demotool holds that commit on no branch", out)
+        self.assertEqual(self.pinned(repo), old)
+
+        # Back on a branch, it is the build taken.
+        git(sibling, "checkout", "-q", "-B", "main", self.new)
+        out = self.repin(repo, public, store, site)
+        self.assertIn(f"demotool: {self.new[:7]}, a local build recorded", out)
+        self.assertNotIn("left out", out)
+        self.assertEqual(self.pinned(repo), new)
+
     def test_with_neither_build_the_pin_is_held(self):
         public, store = self.stores()
         old = self.record(self.old, public)
