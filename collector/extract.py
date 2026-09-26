@@ -657,6 +657,39 @@ def declared_pin(pin, text):
                 datasource=pin["datasource"], declared=True, **extra)
 
 
+# --- the project's own license ------------------------------------------------
+
+# Where a project states its license, at its root, in the order they are tried.
+LICENSE_FILES = ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "COPYING")
+
+# The words a license's own text opens with, and a second phrase where two
+# licenses share an opening. BSD's three clauses come before its two, so the
+# longer one wins a tie.
+_LICENSE_TEXTS = (
+    ("Apache-2.0", ("apache license", "version 2.0")),
+    ("MPL-2.0", ("mozilla public license version 2.0",)),
+    ("MIT", ("permission is hereby granted, free of charge",)),
+    ("ISC", ("permission to use, copy, modify, and/or distribute this software",)),
+    ("BSD-3-Clause", ("redistribution and use in source and binary forms", "neither the name")),
+    ("BSD-2-Clause", ("redistribution and use in source and binary forms",)),
+)
+
+
+def license_name(text):
+    """The SPDX id of the license a LICENSE file states first, or None for a text it does not know.
+
+    A file can quote a second license after its own, such as a notice for a
+    bundled part, so the license whose opening comes first is the file's.
+    """
+    words = " ".join((text or "").lower().split())
+    found = []
+    for rank, (spdx, phrases) in enumerate(_LICENSE_TEXTS):
+        at = [words.find(p) for p in phrases]
+        if min(at) >= 0:
+            found.append((at[0], rank, spdx))
+    return min(found)[2] if found else None
+
+
 # --- a whole repository -------------------------------------------------------
 
 

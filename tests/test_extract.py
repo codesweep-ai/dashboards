@@ -290,3 +290,22 @@ class About(unittest.TestCase):
 
     def test_without_a_version_there_is_no_record(self):
         self.assertIsNone(extract.about_file("name: something\n", "x.ABOUT"))
+
+
+class OwnLicense(unittest.TestCase):
+    def test_a_license_file_is_named_by_its_opening(self):
+        self.assertEqual(extract.license_name("\n                                 Apache License\n"
+                                              "                           Version 2.0, January 2004\n"), "Apache-2.0")
+        self.assertEqual(extract.license_name("MIT License\n\nCopyright (c) 2026 X\n\nPermission is hereby granted, "
+                                              "free of charge, to any person"), "MIT")
+        bsd = "Redistribution and use in source and binary forms, with or without modification, are permitted"
+        self.assertEqual(extract.license_name(bsd), "BSD-2-Clause")
+        self.assertEqual(extract.license_name(bsd + "\n3. Neither the name of the copyright holder"), "BSD-3-Clause")
+
+    def test_a_license_quoted_after_the_files_own_does_not_name_it(self):
+        self.assertEqual(extract.license_name("Permission is hereby granted, free of charge, to any person.\n\n"
+                                              "The bundled parser is under the Apache License, Version 2.0."), "MIT")
+
+    def test_a_text_it_does_not_know_stays_unnamed(self):
+        self.assertIsNone(extract.license_name("All rights reserved."))
+        self.assertIsNone(extract.license_name(None))

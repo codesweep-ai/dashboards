@@ -89,9 +89,11 @@ def license_verdict(dep, policy, categories=None):
     ScanCode LicenseDB category, shown beside a license the policy does not
     name as a hint for which list it belongs in.
     """
-    if dep.get("internal"):
-        return None  # the org's own code, under the org's own license
     expression = " AND ".join(f"({x})" if " " in x else x for x in dep.get("licenses") or [])
+    if dep.get("internal"):
+        # The org's own code: its license is stated, for the page and the SBOM,
+        # and no policy grades it.
+        return {"expression": expression} if expression else None
     ships = shipped(dep)
     aggregate = dep["ecosystem"] in tuple(policy.get("aggregate", ("package", "image", "native", "runtime")))
 

@@ -31,6 +31,13 @@ SPARSE = [
     "/manifests/",
     "/charts/",
     "*.ABOUT",
+    # The project's own license, which its packages carry wherever they are
+    # pinned: extract.LICENSE_FILES, at the root only.
+    "/LICENSE",
+    "/LICENSE.md",
+    "/LICENSE.txt",
+    "/LICENCE",
+    "/COPYING",
     # Not a manifest: a project that carries it installs through cs-npmrevs,
     # which is how its npm steps can reach a version only an image holds.
     "/scripts/with-npmrevs.sh",

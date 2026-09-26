@@ -13,7 +13,7 @@ import urllib.parse
 CATALOG = [
     # --- the projects themselves ---------------------------------------------------
     {"id": "github-git", "group": "projects", "name": "GitHub repositories", "url": "https://github.com",
-     "gives": "Each project's manifests, commit history and source code, and the tags of actions with no releases",
+     "gives": "Each project's manifests, license file, commit history and source code, and the tags of actions with no releases",
      "license": "each repository's own", "hosts": ["github.com"]},
     {"id": "status-files", "group": "projects", "name": "Project status files", "url": "https://pages.github.com",
      "gives": "Each project's description", "license": "each project's own", "hosts": []},

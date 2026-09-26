@@ -97,7 +97,10 @@ def check_evidence(path, label, d):
     if "reachability" in d and d["reachability"] not in REACHABLE:
         fail(path, f"{label}: unknown reachability {d['reachability']!r}")
     lic = d.get("license")
-    if lic is not None and lic.get("verdict") not in VERDICTS:
+    if lic is not None and d.get("internal"):
+        if set(lic) != {"expression"} or not lic["expression"]:
+            fail(path, f"{label}: the org's own package carries its license expression and nothing else, got {lic!r}")
+    elif lic is not None and lic.get("verdict") not in VERDICTS:
         fail(path, f"{label}: unknown license verdict {lic.get('verdict')!r}")
     if lic and "found" in lic and (not lic["found"] or lic.get("found_verdict") not in ("unknown", "review", "denied")):
         fail(path, f"{label}: license.found needs ids and a found_verdict of unknown, review or denied")

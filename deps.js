@@ -470,7 +470,7 @@
       (lc.eol ? " · " + (lc.eol_is_floor ? "supported at least until " : "end of life ") + esc(fmtDate(lc.eol)) : "") + ext(lc.url, "policy"));
     if (d.compat) kv("Compatibility", esc(compatText(d.compat)) + ext(d.compat.url, "policy"));
     if (d.license) kv("License", (d.license.expression ? "<code>" + esc(d.license.expression) + "</code> · " : "") +
-      esc({ allowed: "allowed by the policy", aggregate: "a separate program the image redistributes", "not-shipped": "not in what the project ships",
+      esc(d.internal ? "the org's own, which the policy does not grade" : { allowed: "allowed by the policy", aggregate: "a separate program the image redistributes", "not-shipped": "not in what the project ships",
         unknown: "no license found", review: "the policy asks for a review", denied: "the policy denies it" }[d.license.verdict] || d.license.verdict) +
       (d.license.found ? '<br><span class="dp-muted">its files also carry ' + esc(d.license.found.join(", ")) + " (" + esc(d.license.found_verdict) + ")</span>" +
         ext(d.license.found_url, "scan") : "") +

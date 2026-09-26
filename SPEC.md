@@ -394,7 +394,7 @@ in short, and the page shows it under Sources.
 
 | Source | Read from | What the collector takes | Access | Data terms | Notes |
 |---|---|---|---|---|---|
-| [GitHub repositories](https://github.com/codesweep-ai) | `github.com/<owner>/<project>` over git | Manifests, lockfiles, workflows, Containerfiles, env files, deployment YAML, `.ABOUT` files and pinned files; commit history for internal pins; the full source govulncheck reads; tags, over `git ls-remote`, for an action with no releases | the build's token, sent only to github.com | each repository's own | Clones are blobless and sparse, so only manifest files are downloaded until govulncheck needs the rest. |
+| [GitHub repositories](https://github.com/codesweep-ai) | `github.com/<owner>/<project>` over git | Manifests, lockfiles, workflows, Containerfiles, env files, deployment YAML, `.ABOUT` files, the root `LICENSE` file and pinned files; commit history for internal pins; the full source govulncheck reads; tags, over `git ls-remote`, for an action with no releases | the build's token, sent only to github.com | each repository's own | Clones are blobless and sparse, so only manifest files are downloaded until govulncheck needs the rest. |
 | [Project status files](https://codesweep.ai/) | each project's status file, resolved against `--site` | The one-line description a project card shows | none | each project's own | The same files the CI page reads. |
 | [The previous deps.json](https://codesweep.ai/dashboards/deps.json) | `deps.json` under `--site`, as `--previous` | `history`, `seen`, and each exact version's licenses, provenance and source repository, and each Fedora build's source package and license | none | this site's own | A missing file starts history again, and every fact is asked for afresh. |
 
@@ -583,7 +583,7 @@ Each record in `dependencies` has this shape:
   "fix_advisories": ["GO-2026-6180"], // advisories on the first fixed release, which `fix` steps past
   "in_build": true,                  // Go: whether the project's packages build this module
   "reachability": "not-in-build",    // Go: the closest the code comes to any advisory on it
-  "licenses": ["MIT"],               // SPDX expressions, as its registry or spec states them
+  "licenses": ["MIT"],               // SPDX expressions, as its registry or spec states them, or its project's LICENSE
   "license": { "expression": "MIT", "verdict": "allowed",
                "found": ["MPL-2.0"], "found_verdict": "review",  // flagged or unnamed licenses a scan found in its files
                "unlisted": { "MPL-2.0": "Copyleft Limited" },   // licenses the policy does not name, with a hint
@@ -715,7 +715,9 @@ An expression is graded the way SPDX reads it: `A AND B` takes the worse of the 
 better. `A WITH exception` is graded as that pair when the policy names it, and by `A` otherwise. A dependency is shipped unless its scope is `dev`, `ci`,
 `tool`, `toolchain`, `engines` or `optional`. A Go module is also not shipped when govulncheck found it
 outside the project's build, or when only a second module file such as `go.golangci.mod` requires it. The
-org's own packages carry no verdict.
+org's own packages carry no verdict, and their `license` holds only the `expression`. Where no lockfile or registry
+states one, it is the license of the project the record comes from. It is read from that project's root `LICENSE`
+file, in the clone the run already holds. A license text the collector does not recognise leaves the record without one.
 
 `license.unlisted` maps each license the policy does not name to its LicenseDB category, as a hint for
 which list it belongs in. The category is empty when LicenseDB does not know the license.

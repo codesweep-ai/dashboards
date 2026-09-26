@@ -27,8 +27,8 @@ class FakeRepo:
     the commit it is counted to ("HEAD", or a built commit) to how far it trails that."""
 
     def __init__(self, behind, touching=None, committed=NOW, pinned_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
-                 url="https://github.com/codesweep-ai/ledger", times=None, off_branch=()):
-        self._behind, self._touching = behind, touching
+                 url="https://github.com/codesweep-ai/ledger", times=None, off_branch=(), files=None):
+        self._behind, self._touching, self._files = behind, touching, files or {}
         self.committed, self._pinned_at = committed, pinned_at
         self._times, self._off = times or {}, set(off_branch)
         self.sha, self.branch, self.url = "d687ad5b27750000", "main", url
@@ -46,6 +46,9 @@ class FakeRepo:
 
     def on_branch(self, ref):
         return ref not in self._off
+
+    def read(self, rel):
+        return self._files.get(rel)
 
 
 def resolver(sources=None, repos=None, built=None):
@@ -357,6 +360,16 @@ class Firecracker(unittest.TestCase):
 
 
 class Enrichment(unittest.TestCase):
+    def test_the_orgs_own_records_take_their_projects_license(self):
+        repos = {"ledger": FakeRepo(0, files={"LICENSE": "Apache License\nVersion 2.0, January 2004\n"}),
+                 "lint": FakeRepo(0)}
+        pinned = dep(name="github.com/codesweep-ai/ledger", scope="tool", internal=True, provider="ledger")
+        locked = dep(ecosystem="npm", name="@codesweep-ai/ledger-linux-x64", internal=True, provider="ledger", licenses=["MIT"])
+        bare = dep(name="github.com/codesweep-ai/lint", scope="tool", internal=True, provider="lint")
+        other = dep(name="github.com/spf13/cobra", provider="ledger")
+        resolver(repos=repos).enrich_own_licenses([{"dependencies": [pinned, locked, bare, other]}])
+        self.assertEqual([d.get("licenses") for d in (pinned, locked, bare, other)], [["Apache-2.0"], ["MIT"], None, None])
+
     def test_a_package_endoflife_date_knows_by_purl_takes_its_release_line(self):
         src = FakeSources(eol_products_by_purl={"pkg:npm/react": "react"},
                           cycles=[{"cycle": "19", "releaseDate": "2024-12-05", "eol": False},
@@ -479,7 +492,8 @@ class Policy(unittest.TestCase):
     def test_a_package_an_image_redistributes_is_aggregate(self):
         self.assertEqual(self.verdict(ecosystem="package", licenses=["GPL-2.0-only"], scope="build")["verdict"], "aggregate")
 
-    def test_the_orgs_own_packages_are_not_graded(self):
+    def test_the_orgs_own_packages_state_their_license_and_are_not_graded(self):
+        self.assertEqual(self.verdict(ecosystem="npm", internal=True, licenses=["Apache-2.0"]), {"expression": "Apache-2.0"})
         self.assertIsNone(self.verdict(ecosystem="npm", internal=True, licenses=[]))
 
     def test_supply_chain_signals(self):
@@ -611,6 +625,12 @@ class Sbom(unittest.TestCase):
                             upstream={"effective": "8.18.0-10.fc44"}))
         self.assertEqual(rpm.split("@"), ["pkg:rpm/fedora/curl", "8.18.0-10.fc44?distro=fedora-44"])
         self.assertIsNone(sbom.purl(dep(ecosystem="runtime", name="go", version="1.27")))
+
+    def test_the_orgs_own_components_carry_their_license(self):
+        from collector import sbom
+        own = dep(name="github.com/codesweep-ai/ledger", internal=True, license={"expression": "Apache-2.0"})
+        data = {"org": "o", "generated": "2026-09-12T00:00:00Z", "projects": [{"name": "a", "repo": {}, "dependencies": [own]}]}
+        self.assertEqual(sbom.cyclonedx(data)["components"][0]["components"][0]["licenses"], [{"expression": "Apache-2.0"}])
 
     def test_vex_says_what_the_collector_knows(self):
         from collector import sbom

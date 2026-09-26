@@ -12,7 +12,7 @@ import re
 import urllib.parse
 from datetime import timedelta
 
-from . import versions
+from . import extract, versions
 from .http import FetchError
 from .sources import iso, parse_time
 
@@ -868,6 +868,25 @@ class Resolver:
                 d["repo_signals"] = {k: v for k, v in info.items() if k in ("scorecard", "stars")}
                 if not d.get("licenses") and info.get("license") and d["ecosystem"] in ("native", "actions"):
                     d["licenses"] = [info["license"]]
+
+    def enrich_own_licenses(self, projects):
+        """The org's own records carry the license of the project they come from.
+
+        It is read from that project's root LICENSE file in the clone this run
+        already holds. A record whose lockfile or registry names one keeps it.
+        """
+        own = {}
+        for p in projects:
+            for d in p["dependencies"]:
+                name = d.get("provider")
+                if not d.get("internal") or d.get("licenses") or name not in self.repos:
+                    continue
+                if name not in own:
+                    repo = self.repos[name]
+                    text = next(filter(None, (repo.read(f) for f in extract.LICENSE_FILES)), None)
+                    own[name] = extract.license_name(text)
+                if own[name]:
+                    d["licenses"] = [own[name]]
 
     def enrich_fedora_licenses(self, projects, known=None):
         """The License tag of each Fedora package's source package.

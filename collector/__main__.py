@@ -332,6 +332,7 @@ def main(argv=None):
             log(f"{label} not read: {exc}")
             for p in live:
                 p.setdefault("notes", []).append(f"{label} not read: {exc.reason}")
+    resolver.enrich_own_licenses(live)
 
     log("looking up vulnerabilities")
     try:
