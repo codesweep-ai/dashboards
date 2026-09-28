@@ -108,6 +108,7 @@ class RepinGo(unittest.TestCase):
     def repin(self, repo, public, store, site, local=None):
         env = dict(self.go, CS_BUILDS_DIR=store, CS_STATUS_SITE=site,
                    GOPROXY="file://" + os.path.join(public, "codesweep-ai", "goproxy"))
+        env.pop("LOCAL", None)  # a test says LOCAL itself, never the shell it runs in
         if local is not None:
             env["LOCAL"] = local
         r = subprocess.run([os.path.join(repo, "scripts", "repin-go.sh")], cwd=repo, env=env,
