@@ -256,6 +256,14 @@ An image file has this shape, and `cs-sandbox build` writes it:
   already there stays: a second build of the same commit writes the same bytes.
   The entry is written last, so every file it names is already there. A commit
   already recorded is not built again.
+- **Only recent builds keep their npm packages.** Each build recorded then
+  removes the npm packages of older ones, since cs-npmrevs reads every package
+  it serves before it answers. A build keeps them while it is one of its
+  project's `CS_BUILDS_KEEP` newest (3) by commit time, and was recorded within
+  `CS_BUILDS_KEEP_DAYS` days (3). The newest build of each project keeps them
+  whatever its age. Entries, modules and images stay. A store that is a
+  repository keeps every package, because its members pin each other's builds
+  for as long as the campaign runs.
 - **`versions` means what it means in the status file.** `go` is the module's
   pseudo-version, and `npm` holds the version of the package named after the
   project. `images` stays empty, since an entry is never rewritten. An image made of the
@@ -280,7 +288,8 @@ An image file has this shape, and `cs-sandbox build` writes it:
   `LOCAL=0` leaves the store out. Where the sibling's own checkout sits beside
   the consumer, a local build of a commit it holds on no branch is left out, as
   after a rebase. A newer build left out that way is named. Without such a
-  checkout, as in a campaign member, the store is taken as it stands.
+  checkout, as in a campaign member, the store is taken as it stands. An npm
+  pin also leaves out a build whose package the store no longer holds.
 - **A local pin resolves through the store.** Go reads `goproxy/` ahead of its
   usual proxy, and `GONOSUMDB` names only the modules served from there. npm
   installs through `scripts/with-npmrevs.sh`, which serves `npm/`.

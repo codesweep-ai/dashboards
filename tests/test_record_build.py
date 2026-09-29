@@ -4,6 +4,8 @@ Every project carries the same file, and SPEC.md describes the store it writes,
 so this is where the script is held to that description.
 """
 
+import datetime
+import hashlib
 import io
 import json
 import os
@@ -318,6 +320,75 @@ for (const f of readdirSync(join(here, "packed"))) copyFileSync(join(here, "pack
         (entry,) = self.entries("acme").values()
         self.assertEqual(entry["versions"]["go"], "v" + version)
         self.assertEqual(entry["versions"]["npm"], {"@acme/demo": version})
+
+    def earlier(self, name, stamp, days_ago, store=None):
+        """A build of @acme/<name> committed at stamp and recorded days_ago, filed as
+        record-build.sh files one, with a platform package beside the main one.
+        Returns its package files."""
+        store = store or os.path.join(self.store, "acme")
+        sha = hashlib.sha1((name + stamp).encode()).hexdigest()
+        version = f"0.0.0-{stamp}-{sha[:12]}"
+        committed = datetime.datetime.strptime(stamp, "%Y%m%d%H%M%S").strftime("%Y-%m-%dT%H:%M:%SZ")
+        recorded = "" if days_ago is None else (
+            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        os.makedirs(os.path.join(store, "status", name), exist_ok=True)
+        with open(os.path.join(store, "status", name, sha + ".json"), "w") as f:
+            f.write(f'{{\n "schema": 1,\n "name": "{name}",\n "commit": "{sha}",\n "committed": "{committed}",\n'
+                    f' "recorded": "{recorded}",\n "gate": "make ci",\n "local": true,\n'
+                    f' "versions": {{ "go": "v{version}", "images": {{}}, "npm": {{ "@acme/{name}": "{version}" }} }}\n}}\n')
+        files = [f"acme-{name}-{version}.tgz", f"acme-{name}-linux-x64-{version}.tgz"]
+        os.makedirs(os.path.join(store, "npm"), exist_ok=True)
+        for f in files:
+            tgz(os.path.join(store, "npm", f), f"@acme/{name}", version)
+        return files
+
+    def packages(self, store=None):
+        return sorted(os.listdir(os.path.join(store or os.path.join(self.store, "acme"), "npm")))
+
+    @unittest.skipUnless(shutil.which("go"), "needs go")
+    def test_a_recorded_build_removes_the_npm_packages_of_older_ones(self):
+        # Newest first: kept as the newest whatever its age, gone as older than
+        # three days, then kept as recent, then gone past the third newest.
+        newest = self.earlier("lib", "20260905000000", 10)
+        self.earlier("lib", "20260904000000", 4)
+        recent = self.earlier("lib", "20260903000000", 0.1)
+        self.earlier("lib", "20260902000000", 0.1)
+        self.earlier("lib", "20260901000000", 0.1)
+        # An entry whose times cannot be read keeps its packages.
+        unread = self.earlier("lib", "20260801000000", None)
+        # Every project is pruned, not only the one recording.
+        quiet = self.earlier("tool", "20260810000000", 20)
+        self.earlier("tool", "20260809000000", 20)
+        module = os.path.join(self.store, "acme", "goproxy", "github.com", "acme", "lib", "@v", "v0.0.0-x.zip")
+        os.makedirs(os.path.dirname(module))
+        open(module, "w").close()
+
+        out = self.gate(self.repo(self.GO_MOD))
+        self.assertIn("removed 8 npm packages of older builds", out)
+        self.assertEqual(self.packages(), sorted(newest + recent + unread + quiet))
+        # Entries and modules stay: only the packages cs-npmrevs reads go.
+        self.assertEqual(len(self.entries("acme", "lib")), 6)
+        self.assertEqual(len(self.entries("acme", "tool")), 2)
+        self.assertTrue(os.path.isfile(module))
+
+    @unittest.skipUnless(shutil.which("go"), "needs go")
+    def test_how_many_builds_keep_their_packages_can_be_set(self):
+        for i in range(5):
+            self.earlier("lib", f"2026090{i + 1}000000", 5)
+        env = dict(self.env, CS_BUILDS_KEEP="5", CS_BUILDS_KEEP_DAYS="6")
+        self.assertNotIn("removed", self.gate(self.repo(self.GO_MOD), env=env))
+        self.assertEqual(len(self.packages()), 10)
+
+    @unittest.skipUnless(shutil.which("go"), "needs go")
+    def test_a_store_that_is_a_repository_keeps_every_package(self):
+        store = self.store_repo()
+        for i in range(5):
+            self.earlier("lib", f"2026090{i + 1}000000", 10, store=store)
+        git(store, "add", "-A")
+        git(store, "commit", "-q", "-m", "Record lib")
+        self.gate(self.repo(self.GO_MOD))
+        self.assertEqual(len(self.packages(store)), 10)
+        self.assertEqual(git(store, "status", "--porcelain"), "")
 
 
 if __name__ == "__main__":
