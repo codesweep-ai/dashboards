@@ -95,7 +95,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.21.0"
           cache: npm
 
       # The design tokens come out of @codesweep-ai/ui rather than a copy kept
