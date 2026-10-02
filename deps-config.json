@@ -63,6 +63,27 @@
    "label": "axe-core (vendored for tests)",
    "datasource": "npm",
    "package": "axe-core"
+  },
+  {
+   "project": "tour",
+   "path": "Makefile",
+   "match": "^CAMPAIGN_VERSION \\?= (\\S+)",
+   "ecosystem": "go",
+   "scope": "tool",
+   "internal": true,
+   "name": "github.com/codesweep-ai/campaign",
+   "datasource": "goproxy",
+   "package": "github.com/codesweep-ai/campaign"
+  },
+  {
+   "project": "tour",
+   "path": "Makefile",
+   "match": "^OPENCODE_VERSION\\s*:=\\s*(\\S+)",
+   "name": "github.com/anomalyco/opencode",
+   "label": "opencode",
+   "datasource": "github",
+   "package": "anomalyco/opencode",
+   "tag_prefix": "v"
   }
  ],
  "snapshots": [
