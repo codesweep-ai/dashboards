@@ -9,6 +9,7 @@
   { "name": "lint",     "status": "../lint/ci-status.json" },
   { "name": "npmrevs",  "status": "../npmrevs/ci-status.json" },
   { "name": "sandbox",  "status": "../sandbox/ci-status.json" },
+  { "name": "tour",     "status": "../tour/ci-status.json" },
   { "name": "tracer",   "status": "../tracer/ci-status.json" },
   { "name": "ui",       "status": "../ui/ci-status.json" },
   { "name": "vcr",      "status": "../vcr/ci-status.json" }
