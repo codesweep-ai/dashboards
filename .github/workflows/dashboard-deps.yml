@@ -28,7 +28,7 @@ jobs:
       # For govulncheck, which the collector builds from the pin in go.mod and
       # runs over each Go project. GOTOOLCHAIN=auto lets a project's own go
       # directive fetch the toolchain it asks for.
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
