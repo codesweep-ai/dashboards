@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # For govulncheck, which the collector builds from the pin in go.mod and
       # runs over each Go project. GOTOOLCHAIN=auto lets a project's own go

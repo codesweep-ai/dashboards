@@ -77,7 +77,7 @@ jobs:
       # The branch's history without its file contents, beyond what the site is
       # built from: the status file asks git whether each build it lists is
       # still on the branch, rather than asking GitHub's API.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           filter: blob:none
