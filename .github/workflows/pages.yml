@@ -137,7 +137,7 @@ jobs:
           # Publishing the dependency tree would be a slow, silent mistake.
           test ! -e _site/node_modules || { echo "node_modules reached the site" >&2; exit 1; }
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: ./_site
 
