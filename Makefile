@@ -169,8 +169,9 @@ refs:
 	$(CS_LINT) refs
 
 ## oss: the rules this repo has to satisfy as a published project
+## OSS_SINCE=<commit> reads only the history after it, as CI passes it.
 oss:
-	$(CS_LINT) oss
+	$(CS_LINT) oss $(if $(OSS_SINCE),--since $(OSS_SINCE))
 
 # The three targets above are one shared tool: github.com/codesweep-ai/lint,
 # pinned in go.mod and run with `go tool`, so the gates use the version this
