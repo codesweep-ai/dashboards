@@ -112,7 +112,7 @@ jobs:
           merge-multiple: true
           path: ./
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
       # The same Jekyll the sibling projects' branch-served sites are built with,
       # so the documents render the same way here. That includes the plugin that

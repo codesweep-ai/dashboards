@@ -52,7 +52,7 @@ jobs:
       # deps-feed.xml is the alert channel, an Atom feed any reader can follow.
       # deps.cdx.json is the same inventory as a CycloneDX SBOM with VEX.
       - id: pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: run the collector
         env:
