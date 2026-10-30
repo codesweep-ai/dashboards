@@ -20,7 +20,7 @@ PRODUCT = {
     "go": "Go", "nodejs": "Node.js", "python": "Python", "eclipse-temurin": "Java (Temurin)", "apache-maven": "Maven",
     "fedora": "Fedora", "debian": "Debian", "ubuntu": "Ubuntu", "alpine": "Alpine", "linux": "Linux kernel",
     "windows-server": "Windows Server", "macos": "macOS", "firecracker": "Firecracker", "react": "React",
-    "eslint": "ESLint", "nvm": "nvm",
+    "eslint": "ESLint", "nvm": "nvm", "lean": "Lean 4", "cvc5": "cvc5",
 }
 ECO_LABEL = {
     "runtime": "Toolchains", "image": "Images & runners", "native": "Native & binaries", "package": "System packages",

@@ -359,6 +359,53 @@ class Firecracker(unittest.TestCase):
         self.assertIsNone(actions.compat_options(kernel["compat"]))
 
 
+def gh_releases(prefix, *rows):
+    return [{"tag": prefix + tag, "published": day + "T00:00:00Z", "prerelease": "-rc" in tag, "url": ""}
+            for tag, day in rows]
+
+
+LEAN = gh_releases("v", ("4.36.0-rc1", "2026-09-02"), ("4.35.0", "2026-08-30"), ("4.34.1", "2026-08-10"),
+                   ("4.34.0", "2026-07-31"), ("4.33.0", "2026-06-30"), ("4.32.0", "2026-05-31"))
+
+
+class NoSupportPolicy(unittest.TestCase):
+    """Lean and cvc5 publish no support window, so a line is placed against the two newest instead."""
+
+    def toolchain(self, version, name="lean", package="leanprover/lean4", prefix="v", rows=LEAN):
+        src = FakeSources(github_releases=rows, github_tags={})
+        r = resolver(src)
+        return r.classify(r.resolve(dep(ecosystem="runtime", name=name, version=version, datasource="github",
+                                        package=package, tag_prefix=prefix, scope="build")))
+
+    def test_a_line_among_the_two_newest_is_recent_and_has_no_end(self):
+        d = self.toolchain("4.34.1")
+        lc = d["lifecycle"]
+        self.assertEqual((lc["product"], lc["cycle"], lc["phase"], lc["lines"], lc["release"], lc["eol"], lc["policy"]),
+                         ("lean", "4.34", "recent", ["4.35", "4.34"], "2026-07-31", None, "none"))
+        self.assertNotIn("window_end", lc)
+        # How far it trails is the versions, as for any pin: one minor behind, not an end of life.
+        self.assertEqual((d["status"], d["behind"]), ("minor", "minor"))
+
+    def test_a_line_leaves_the_window_when_the_second_line_after_it_ships(self):
+        d = self.toolchain("4.33.0")
+        self.assertEqual((d["lifecycle"]["phase"], d["lifecycle"]["window_end"]), ("superseded", "2026-08-30"))
+        self.assertNotIn(d["status"], ("eol", "eol-soon"))
+
+    def test_the_newest_line_is_recent(self):
+        self.assertEqual(self.toolchain("4.35.0")["lifecycle"]["phase"], "recent")
+
+    def test_a_tag_prefix_is_read_through(self):
+        rows = gh_releases("cvc5-", ("1.4.2", "2026-10-08"), ("1.4.0", "2026-09-17"), ("1.3.4", "2026-05-07"), ("1.2.1", "2025-01-28"))
+        lc = self.toolchain("1.4.2", name="cvc5", package="cvc5/cvc5", prefix="cvc5-", rows=rows)["lifecycle"]
+        self.assertEqual((lc["cycle"], lc["phase"], lc["lines"], lc["release"]), ("1.4", "recent", ["1.4", "1.3"], "2026-09-17"))
+
+    def test_a_native_binary_gets_no_window(self):
+        d = resolver(FakeSources(github_releases=LEAN, github_tags={})).resolve(
+            dep(ecosystem="native", name="github.com/leanprover/lean4", version="4.33.0", datasource="github",
+                package="leanprover/lean4", tag_prefix="v", scope="build"))
+        self.assertNotIn("lifecycle", d)
+
+
 class Enrichment(unittest.TestCase):
     def test_the_orgs_own_records_take_their_projects_license(self):
         repos = {"ledger": FakeRepo(0, files={"LICENSE": "Apache License\nVersion 2.0, January 2004\n"}),

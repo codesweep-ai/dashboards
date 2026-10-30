@@ -120,7 +120,8 @@ Four more views show the whole org another way:
   `deps-config.json` are listed below the tiers, with when each lapses.
 - **Internal** gives each project a card of its pins on siblings, and of who pins it in turn.
 - **Lifecycle** puts every runtime, OS release, runner image, kernel line and supported library on one
-  calendar, and names what publishes no support window.
+  calendar, and names what publishes no support window. A toolchain with no published window, such as
+  Lean, shows whether its line is one of the two newest.
 - **Inventory** lists every tracked dependency, with a filter. Indirect dependencies are included on
   request. Their advisories are checked, and their newest release is not looked up, so they read as not
   compared.

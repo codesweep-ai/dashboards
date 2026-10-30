@@ -1,0 +1,20 @@
+{
+  "id": "DSH-032",
+  "title": "Lean and cvc5 show as native binaries with no lifecycle, though sandbox ships them as toolchains",
+  "type": "defect",
+  "severity": "med",
+  "status": "in-progress",
+  "foundBy": "repository owner: \"The dashboard isn't reporting Lean as a toolchain, with its lifecycle etc, in the deps dashboard\", and \"CVC5 should count as a toolchain as well\"",
+  "opened": "2026-10-29",
+  "resolved": null,
+  "stint": "2026-10-29 Lean in the image",
+  "evidence": {
+    "commits": [],
+    "integrated": [],
+    "verified": null
+  },
+  "resolution": null,
+  "details": "sandbox's image/Containerfile.base installs the Lean toolchain and the cvc5 solver from their GitHub releases, each pinned by an `ARG *_VERSION`. `upstream_from_url` in collector/extract.py turns only Temurin, Go, Node.js and Maven downloads into a `runtime` record. Any other GitHub release download becomes a `native` record. So the dependencies page lists both as native binaries, outside \"Toolchains and runtimes\", and gives neither a lifecycle.\n\nA lifecycle comes from endoflife.date, which has no product for either, or from a publisher's own policy. Neither project publishes a support window or a long-term line.\n\nWanted: both are toolchains, with no end of life, because neither publishes one. The lifecycle calendar still shows whether a pin's line is one of the two newest, from the GitHub releases. elan stays a native binary beside nvm and pyenv.",
+  "notes": [],
+  "links": []
+}

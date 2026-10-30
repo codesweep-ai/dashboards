@@ -29,7 +29,14 @@ RUNTIME_LABELS = {
     "python": "Python",
     "java": "Java (Temurin)",
     "maven": "Maven",
+    "lean": "Lean 4",
+    "cvc5": "cvc5",
 }
+
+# Toolchains that ship only as GitHub releases, by repository. Their downloads
+# are runtimes rather than native binaries, so they sit with the other
+# toolchains, though their release lines come from the releases themselves.
+GITHUB_RUNTIMES = {"leanprover/lean4": "lean", "cvc5/cvc5": "cvc5"}
 
 
 def _dep(ecosystem, name, version, path, line, **kw):
@@ -375,6 +382,10 @@ def upstream_from_url(url, var):
         return {"ecosystem": "runtime", "name": "maven", "datasource": "maven",
                 "package": "org.apache.maven:apache-maven", "label": RUNTIME_LABELS["maven"]}
     m = re.search(r"github\.com/([\w.-]+)/([\w.-]+)/releases/download/([^/$]*)" + v, url)
+    if m and f"{m.group(1)}/{m.group(2)}" in GITHUB_RUNTIMES:
+        name = GITHUB_RUNTIMES[f"{m.group(1)}/{m.group(2)}"]
+        return {"ecosystem": "runtime", "name": name, "datasource": "github",
+                "package": f"{m.group(1)}/{m.group(2)}", "tag_prefix": m.group(3), "label": RUNTIME_LABELS[name]}
     if m:
         return {"ecosystem": "native", "name": f"github.com/{m.group(1)}/{m.group(2)}", "datasource": "github",
                 "package": f"{m.group(1)}/{m.group(2)}", "tag_prefix": m.group(3), "label": m.group(2)}

@@ -243,6 +243,34 @@ class Resolver:
             dep["behind"] = versions.distance(effective or pin, latest)
         if repo == "firecracker-microvm/firecracker" and pin:
             self._firecracker_lifecycle(dep, versions.cycle_of(pin, 2))
+        if dep["ecosystem"] == "runtime" and pin:
+            self._recent_lines(dep, cands, effective or pin, line, repo)
+
+    def _recent_lines(self, dep, cands, pin, line_latest, repo):
+        """A toolchain whose publisher states no support window: is its line one of the two newest?
+
+        Lean and cvc5 publish no end of life and no long-term line, so the record carries none. What
+        it can say is whether the pin is on one of the two newest release lines. A line leaves that
+        window the day the second line after it ships.
+        """
+        cycle = versions.cycle_of(pin, 2)
+        if cycle is None:
+            return
+        # Each line's first release, the day it shipped. A tag read without its release has no date.
+        first = {}
+        for v, r in cands.items():
+            line = versions.cycle_of(v, 2)
+            days = [d for d in (first.get(line), (r.get("published") or "")[:10]) if d]
+            first[line] = min(days) if days else None
+        newer = sorted((l for l in first if versions.parse(cycle) < versions.parse(l)), key=versions.parse)
+        newest = sorted(set(first) | {cycle}, key=versions.parse, reverse=True)[:2]
+        lc = {"product": dep["name"], "cycle": cycle, "release": first.get(cycle), "support": None, "eol": None,
+              "policy": "none", "lines": newest, "lts": False, "latest": line_latest or pin,
+              "phase": "recent" if len(newer) < 2 else "superseded",
+              "url": f"https://github.com/{repo}/releases"}
+        if len(newer) >= 2 and first.get(newer[1]):
+            lc["window_end"] = first[newer[1]]
+        dep["lifecycle"] = lc
 
     def _firecracker_lifecycle(self, dep, cycle):
         """Firecracker's own support table: a line is supported at least until a date."""

@@ -340,7 +340,7 @@ schedule when nothing else here does.
 | npm packages | `package.json`, resolved through `package-lock.json` | registry.npmjs.org, with release dates from deps.dev |
 | Python packages | `pip install` | pypi.org |
 | GitHub Actions | `uses:` in workflows and in `action.yml`, and installs in `run:` steps | GitHub releases, or tags where a project publishes no releases |
-| Toolchains | the `go` directive, `go-version`, `node-version`, `nvm install`, `pyenv install`, download URLs | endoflife.date, the Go module proxy, nodejs.org, Maven Central |
+| Toolchains | the `go` directive, `go-version`, `node-version`, `nvm install`, `pyenv install`, download URLs | endoflife.date, the Go module proxy, nodejs.org, Maven Central, and GitHub releases for Lean and cvc5 |
 | Images and runners | `FROM`, `image:`, image references in `.env` files, `runs-on` and matrix `os:` labels, a WSL `distribution:` | GitHub's runner-images table for what a label runs, endoflife.date for an OS release, the registry for tags |
 | System packages | `dnf install` in a Containerfile | Fedora's mdapi for the version each name resolves to, and Bodhi for security updates |
 | Native and binaries | an `ARG *_VERSION` whose download URL names its upstream, a Renovate annotation, a declared pin | GitHub releases, or the datasource the pin names; Firecracker's own support tables |
@@ -558,6 +558,9 @@ Each record in `dependencies` has this shape:
   "libyears": 0.27,
   "lifecycle": { "product": "linux", "cycle": "6.19", "release": "2026-02-08", "support": null,
                  "eol_is_floor": false,    // true when the end is only "supported at least until"
+                 // phase is active, maintenance, eol-soon, eol or unknown. Where the publisher states no
+                 // support window, "policy" is "none", "eol" is null, "lines" names the two newest lines,
+                 // and phase is recent or superseded, with "window_end" the day a superseded line left them.
                  "eol": "2026-04-22", "lts": false, "latest": "6.19.14", "phase": "eol", "url": "…" },
   "lag": { "commits": 8, "commits_touching": 1, "paths": ["action"], "days": 0.5,
            "head": "d687ad5b27750000…",   // the whole commit the sibling's default branch is at
@@ -803,6 +806,11 @@ one of Dependabot's dismissal reasons: `fix_started`, `inaccurate`, `no_bandwidt
   no OS version, so it is named and marked `unknown` rather than guessed.
 - **A support window known only as a floor is shown as one.** Firecracker guarantees a release line until
   a date and may support it longer; `eol_is_floor` marks that date, and the phase is read from it.
+- **A toolchain whose publisher states no support window has no end of life.** Lean and cvc5 publish
+  none, and no long-term line, so their releases come from GitHub and their release lines carry `policy`
+  `none` and no `eol`. A line is `recent` while it is one of the two newest, and `superseded` from the day
+  the second line after it ships, which `window_end` records. Neither phase is an end of life, so a pin's
+  status comes from how far its version trails.
 - **A system package floats with its release.** It is vulnerable when Fedora pushed a security update for
   its source package after the image carrying it was built. A snapshot in the configuration says when
   that was. The match is by source package name, so a package installed only as another's dependency is
@@ -1189,7 +1197,7 @@ Where support dates come from.
 | xeol | It matches an SBOM or an image against endoflife.date's data. |
 | Docker Scout | It recommends a newer base image tag for an image it scans. |
 | Chainguard | Its images are rebuilt as upstream releases land, so freshness becomes the image publisher's job. |
-| **This dashboard** | It reads endoflife.date by product or package identifier, and the publisher's own policy where that has none: Firecracker, GitHub's runner images, nodejs.org and go.dev. A support end known only as a floor is shown as one. A guest kernel is checked against the lines Firecracker validates, and pointed at the newest long-term one. |
+| **This dashboard** | It reads endoflife.date by product or package identifier, and the publisher's own policy where that has none: Firecracker, GitHub's runner images, nodejs.org and go.dev. A support end known only as a floor is shown as one. Where a publisher states no policy at all, as Lean and cvc5 do, it shows no end, only whether a line is one of the two newest. A guest kernel is checked against the lines Firecracker validates, and pointed at the newest long-term one. |
 
 ### Vulnerabilities
 

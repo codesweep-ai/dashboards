@@ -191,6 +191,17 @@ RUN base=https://downloads.claude.ai/claude-code-releases && curl "$base/$CLAUDE
 # renovate: datasource=github-releases depName=firecracker-microvm/firecracker
 ARG FC_VERSION=1.16.0
 
+ARG ELAN_VERSION=4.2.4
+ARG LEAN_VERSION=4.34.1
+RUN curl -fsSL -o /tmp/elan.tar.gz \
+       "https://github.com/leanprover/elan/releases/download/v${ELAN_VERSION}/elan-x86_64-unknown-linux-gnu.tar.gz" \
+  && curl -fsSL -o /tmp/lean.tar.zst \
+       "https://github.com/leanprover/lean4/releases/download/v${LEAN_VERSION}/lean-${LEAN_VERSION}-linux${lsuffix}.tar.zst"
+
+ARG CVC5_VERSION=1.4.2
+RUN curl -fsSL -o /tmp/cvc5.zip \
+       "https://github.com/cvc5/cvc5/releases/download/cvc5-${CVC5_VERSION}/cvc5-Linux-${carch}-static.zip"
+
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.7/install.sh | bash \
   && bash -c 'nvm install v24.19.0' \
   && pyenv install -s 3.14.7 \
@@ -217,6 +228,15 @@ FROM ${AGENTS_REF}
         self.assertEqual(codex["tag_prefix"], "rust-v")
         go = [d for d in self.deps if d["ecosystem"] == "runtime" and d["name"] == "go"][0]
         self.assertEqual(go["version"], "1.27.0")
+
+    def test_lean_and_cvc5_are_toolchains_and_elan_is_not(self):
+        # Both ship only as GitHub releases, and both are what a project builds with, so they sit with
+        # the other toolchains. elan, like nvm and pyenv, only installs one.
+        rt = {d["name"]: d for d in self.deps if d["ecosystem"] == "runtime"}
+        self.assertEqual((rt["lean"]["version"], rt["lean"]["datasource"], rt["lean"]["package"], rt["lean"]["tag_prefix"]),
+                         ("4.34.1", "github", "leanprover/lean4", "v"))
+        self.assertEqual((rt["cvc5"]["version"], rt["cvc5"]["package"], rt["cvc5"]["tag_prefix"]), ("1.4.2", "cvc5/cvc5", "cvc5-"))
+        self.assertEqual(by(self.deps, "github.com/leanprover/elan")[0]["ecosystem"], "native")
 
     def test_a_pin_nobody_can_place_is_reported(self):
         self.assertEqual([u[0] for u in self.unplaced], ["CLAUDE_CODE_VERSION"])

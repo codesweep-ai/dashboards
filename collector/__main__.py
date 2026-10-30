@@ -104,7 +104,7 @@ def lifecycle_table(projects):
             label = d.get("label") or d["name"]
             if label not in row["dependencies"]:
                 row["dependencies"].append(label)
-    order = {"eol": 0, "eol-soon": 1, "maintenance": 2, "active": 3, "unknown": 4}
+    order = {"eol": 0, "eol-soon": 1, "maintenance": 2, "superseded": 2, "active": 3, "recent": 3, "unknown": 4}
     return sorted(rows.values(), key=lambda r: (order.get(r["phase"], 5), r.get("eol") or "9999", r["product"]))
 
 

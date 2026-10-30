@@ -42,10 +42,10 @@
     go: "Go", nodejs: "Node.js", python: "Python", "eclipse-temurin": "Java (Temurin)", "apache-maven": "Maven",
     fedora: "Fedora", debian: "Debian", ubuntu: "Ubuntu", alpine: "Alpine", linux: "Linux kernel",
     "windows-server": "Windows Server", macos: "macOS", firecracker: "Firecracker", react: "React",
-    eslint: "ESLint", nvm: "nvm"
+    eslint: "ESLint", nvm: "nvm", lean: "Lean 4", cvc5: "cvc5"
   };
   var LIFECYCLE_GROUPS = [
-    { title: "Toolchains and runtimes", products: ["go", "nodejs", "python", "eclipse-temurin", "apache-maven"] },
+    { title: "Toolchains and runtimes", products: ["go", "nodejs", "python", "eclipse-temurin", "apache-maven", "lean", "cvc5"] },
     { title: "Operating systems, runners and kernels", products: ["fedora", "debian", "ubuntu", "alpine", "macos", "windows-server", "linux"] },
     { title: "Native binaries", products: ["firecracker"] },
     { title: "Libraries and tools", products: null }
@@ -466,7 +466,8 @@
     if (d.fix && d.vulnerabilities) kv("Fix", "<code>" + esc(d.fix) + "</code>" + (d.fix_advisories ? ' <span class="dp-muted">· steps past ' + esc(d.fix_advisories.join(", ")) +
       ", which affect" + (d.fix_advisories.length === 1 ? "s" : "") + " the first fixed release</span>" : "") +
       (d.fix_partial ? ' <span class="dp-muted">· no release fixes every advisory yet</span>' : ""));
-    if (lc) kv("Release line", esc(productName(lc)) + " · " + esc({ active: "supported", maintenance: "security fixes only", "eol-soon": "support closing", eol: "past its end of life", unknown: "no support data" }[lc.phase] || lc.phase) +
+    if (lc) kv("Release line", esc(productName(lc)) + " · " + esc({ active: "supported", maintenance: "security fixes only", "eol-soon": "support closing", eol: "past its end of life", unknown: "no support data",
+      recent: "one of the two newest lines, no published support policy", superseded: "older than the two newest lines, no published support policy" }[lc.phase] || lc.phase) +
       (lc.eol ? " · " + (lc.eol_is_floor ? "supported at least until " : "end of life ") + esc(fmtDate(lc.eol)) : "") + ext(lc.url, "policy"));
     if (d.compat) kv("Compatibility", esc(compatText(d.compat)) + ext(d.compat.url, "policy"));
     if (d.license) kv("License", (d.license.expression ? "<code>" + esc(d.license.expression) + "</code> · " : "") +
@@ -764,9 +765,12 @@
 
   // --- lifecycle ---------------------------------------------------------------
 
-  function phaseLevel(r) { return r.phase === "eol" ? "critical" : r.phase === "eol-soon" ? "serious" : r.phase === "maintenance" ? "warning" : r.phase === "unknown" ? "idle" : "good"; }
-  function phaseStatus(r) { return r.phase === "eol" ? "eol" : r.phase === "eol-soon" ? "eol-soon" : r.phase === "maintenance" ? "floating" : r.phase === "unknown" ? "unknown" : "current"; }
+  function phaseLevel(r) { return r.phase === "eol" ? "critical" : r.phase === "eol-soon" ? "serious" : r.phase === "maintenance" || r.phase === "superseded" ? "warning" : r.phase === "unknown" ? "idle" : "good"; }
+  function phaseStatus(r) { return r.phase === "eol" ? "eol" : r.phase === "eol-soon" ? "eol-soon" : r.phase === "maintenance" ? "floating" : r.phase === "superseded" ? "minor" : r.phase === "unknown" ? "unknown" : "current"; }
   function phaseWords(r) {
+    // A publisher with no support policy gets no end date; the window is its two newest lines.
+    if (r.phase === "recent") return "one of the two newest lines";
+    if (r.phase === "superseded") return r.window_end ? "left the two newest lines " + fmtAgo(r.window_end) : "older than the two newest lines";
     if (r.phase === "eol") return "ended " + fmtAgo(r.eol);
     if (!r.eol) return r.phase === "unknown" ? "no support data" : r.phase === "maintenance" ? "security fixes only" : "supported, no end date";
     if (r.eol_is_floor) return (r.phase === "eol-soon" ? "guaranteed only " : "supported at least ") + "until " + fmtDate(r.eol);
@@ -801,6 +805,17 @@
         (r.support ? "\nactive support until " + fmtDate(r.support) : "") +
         "\n" + (r.eol_is_floor ? "supported at least until " : "end of life ") + (r.eol ? fmtDate(r.eol) : "not announced") +
         (r.latest ? "\nnewest " + r.latest : "") + "\nused by " + r.projects.join(", ") + "\nfor " + r.dependencies.join(", ");
+      if (r.policy === "none") {
+        // No end to draw. The solid bar is the line's time among the two newest, and the striped
+        // one its time since, up to today.
+        s = r.window_end ? pct(r.window_end) : null;
+        e = today;
+        eolShown = false;
+        tip = (PRODUCT[r.product] || r.product) + " " + r.cycle + "\nreleased " + fmtDate(r.release) +
+          "\nno published support policy" + "\nthe two newest lines: " + (r.lines || []).join(", ") +
+          (r.window_end ? "\nleft them " + fmtDate(r.window_end) : "") +
+          (r.latest ? "\nnewest " + r.latest : "") + "\nused by " + r.projects.join(", ") + "\nfor " + r.dependencies.join(", ");
+      }
       var active = '<i class="dp-tl__active" style="left:' + a + "%;width:" + Math.max(0, (s != null ? s : e) - a) + '%"></i>';
       var maint = s != null && e > s ? '<i class="dp-tl__maint" style="left:' + s + "%;width:" + (e - s) + '%"></i>' : "";
       var cap = eolShown ? '<i class="dp-tl__eol dp-tl__eol--' + phaseLevel(r) + (r.eol_is_floor ? " dp-tl__eol--floor" : "") + '" style="left:' + e + '%"></i>' : "";
@@ -819,7 +834,8 @@
     var used = {};
     var html = '<p class="dp-view__intro">Every release line in use, on one calendar: runtimes, operating systems and CI runners, kernels, and the ' +
       "native binaries and libraries whose publishers state a support window. The bar runs from a release to the end of its support; " +
-      "the striped end is security fixes only; the line is today.</p>";
+      "the striped end is security fixes only; the line is today. A toolchain whose publisher states no window, such as Lean, has " +
+      "no end: its bar is solid while its line is one of the two newest, and striped since.</p>";
     LIFECYCLE_GROUPS.forEach(function (g) {
       var list = rows.filter(function (r) {
         if (used[r.product + r.cycle]) return false;
@@ -852,8 +868,10 @@
       "</tr></thead><tbody>" + rows.map(function (r) {
         return '<tr><td><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc((PRODUCT[r.product] || r.product) + " " + r.cycle) + "</a>" +
           '<span class="dp-sub">' + esc(r.dependencies.join(", ")) + "</span></td><td>" +
-          chip(phaseLevel(r), phaseStatus(r), r.phase === "maintenance" ? "security only" : r.phase === "active" ? "supported" : STATUS_LABEL[phaseStatus(r)]) +
-          "</td><td>" + fmtDate(r.release) + "</td><td>" + fmtDate(r.support) + "</td><td>" + (r.eol_is_floor ? "≥ " : "") + fmtDate(r.eol) + "</td><td>" + esc(r.latest || "—") +
+          chip(phaseLevel(r), phaseStatus(r), r.phase === "maintenance" ? "security only" : r.phase === "active" ? "supported" :
+            r.phase === "recent" ? "two newest lines" : r.phase === "superseded" ? "superseded" : STATUS_LABEL[phaseStatus(r)]) +
+          "</td><td>" + fmtDate(r.release) + "</td><td>" + fmtDate(r.support) + "</td><td>" +
+          (r.policy === "none" ? "none published" : (r.eol_is_floor ? "≥ " : "") + fmtDate(r.eol)) + "</td><td>" + esc(r.latest || "—") +
           '</td><td class="dp-wrap">' + r.projects.map(function (n) { return navLink(projectHref(n, "lifecycle"), esc(n)); }).join(", ") + "</td></tr>";
       }).join("") + "</tbody></table></div>";
     return html;
