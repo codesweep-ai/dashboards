@@ -3,17 +3,19 @@
   "title": "Lean and cvc5 show as native binaries with no lifecycle, though sandbox ships them as toolchains",
   "type": "defect",
   "severity": "med",
-  "status": "in-progress",
+  "status": "closed",
   "foundBy": "repository owner: \"The dashboard isn't reporting Lean as a toolchain, with its lifecycle etc, in the deps dashboard\", and \"CVC5 should count as a toolchain as well\"",
   "opened": "2026-10-29",
-  "resolved": null,
+  "resolved": "2026-10-29",
   "stint": "2026-10-29 Lean in the image",
   "evidence": {
-    "commits": [],
+    "commits": [
+      "c8ad176"
+    ],
     "integrated": [],
-    "verified": null
+    "verified": "`make check` passed on the tree that became c8ad176, with 191 tests. `make dependencies` then wrote sandbox's Lean 4.34.1 and cvc5 1.4.2 as runtime records, each with phase `recent`, no `eol` and `policy` `none`. Lean's two newest lines were 4.35 and 4.34, and its status was minor behind 4.35.0 at level info. elan stayed a native record. Headless Chrome screenshots of the lifecycle view showed both rows under Toolchains and runtimes, in the light and the dark theme. A copy of the data with Lean on a superseded line drew the bar striped after `window_end`, with the warning chip."
   },
-  "resolution": null,
+  "resolution": "Lean and cvc5 are toolchains with no end of life, because neither publishes a support window. Their lifecycle rows say whether the pinned line is one of the two newest.",
   "details": "sandbox's image/Containerfile.base installs the Lean toolchain and the cvc5 solver from their GitHub releases, each pinned by an `ARG *_VERSION`. `upstream_from_url` in collector/extract.py turns only Temurin, Go, Node.js and Maven downloads into a `runtime` record. Any other GitHub release download becomes a `native` record. So the dependencies page lists both as native binaries, outside \"Toolchains and runtimes\", and gives neither a lifecycle.\n\nA lifecycle comes from endoflife.date, which has no product for either, or from a publisher's own policy. Neither project publishes a support window or a long-term line.\n\nWanted: both are toolchains, with no end of life, because neither publishes one. The lifecycle calendar still shows whether a pin's line is one of the two newest, from the GitHub releases. elan stays a native binary beside nvm and pyenv.",
   "notes": [],
   "links": []
