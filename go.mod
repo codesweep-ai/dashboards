@@ -13,7 +13,7 @@ tool (
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/codesweep-ai/ledger v0.0.0-20261030032934-fa2fe59d4f58 // indirect
+	github.com/codesweep-ai/ledger v0.0.0-20261030042257-ac350b6e5e5f // indirect
 	github.com/codesweep-ai/lint v0.0.0-20261028214306-6d35a8ef43e8 // indirect
 	github.com/codesweep-ai/npmrevs v0.0.0-20260929195159-d74ecfc3b09b // indirect
 	github.com/docker/cli v29.7.2+incompatible // indirect
