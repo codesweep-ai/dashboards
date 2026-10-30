@@ -1,6 +1,6 @@
 module github.com/codesweep-ai/dashboards
 
-go 1.27.0
+go 1.27.3
 
 tool (
 	github.com/codesweep-ai/ledger/cmd/cs-ledger
