@@ -779,7 +779,19 @@
     return "supported, ends " + fmtAgo(r.eol);
   }
 
+  // Lines whose publisher states a policy keep the collector's order, the most urgent first. A line
+  // with no policy has no end to sort by, so it follows them, in the order LIFECYCLE_GROUPS names
+  // its product: Lean, then cvc5.
+  var PRODUCT_RANK = [].concat.apply([], LIFECYCLE_GROUPS.map(function (g) { return g.products || []; }));
+  function lifecycleOrder(rows) {
+    function rank(r) { var i = PRODUCT_RANK.indexOf(r.product); return i < 0 ? PRODUCT_RANK.length : i; }
+    var unset = rows.filter(function (r) { return r.policy === "none"; });
+    return rows.filter(function (r) { return r.policy !== "none"; })
+      .concat(unset.sort(function (a, b) { return rank(a) - rank(b); }));
+  }
+
   function timeline(rows) {
+    rows = lifecycleOrder(rows);
     var now = Date.now(), DAY = 864e5;
     var start = now - 365 * DAY, end = now + 3 * 365 * DAY;
     function pct(iso) {
@@ -865,7 +877,7 @@
     }
     html += '<h2 class="dp-h2">As a table</h2><div class="ci-table__wrap"><table class="ci-table"><thead><tr>' +
       ["Release", "State", "Released", "Active support", "End of life", "Newest", "Used by"].map(function (h) { return '<th class="text-label-upper">' + h + "</th>"; }).join("") +
-      "</tr></thead><tbody>" + rows.map(function (r) {
+      "</tr></thead><tbody>" + lifecycleOrder(rows).map(function (r) {
         return '<tr><td><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc((PRODUCT[r.product] || r.product) + " " + r.cycle) + "</a>" +
           '<span class="dp-sub">' + esc(r.dependencies.join(", ")) + "</span></td><td>" +
           chip(phaseLevel(r), phaseStatus(r), r.phase === "maintenance" ? "security only" : r.phase === "active" ? "supported" :
